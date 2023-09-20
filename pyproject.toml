@@ -1,0 +1,35 @@
+[tool.poetry]
+name = "openai-processor"
+version = "0.1.0"
+description = "A framework to make parallel and user rate limited API calls to OpenAI"
+authors = ["vignesh-nswamy"]
+license = "MIT"
+readme = "README.md"
+packages = [
+    { include = "openai_processor", from = "src" },
+]
+repository = "https://github.com/vnaray/openai-processor"
+
+[tool.poetry.dependencies]
+python = ">=3.9,<4.0"
+openai = "0.28.0"
+tiktoken = "0.5.1"
+typer = "0.9.0"
+rich = "^13.5.3"
+pydantic = "1.10.12"
+
+[tool.poetry.scripts]
+openai-processor = "openai_processor.cli:app"
+
+
+[tool.poetry.group.dev.dependencies]
+jupyter = "^1.0.0"
+
+
+[tool.poetry.group.experimental.dependencies]
+marvin = "^1.4.2"
+langchain = "^0.0.295"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
