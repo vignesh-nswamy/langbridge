@@ -140,7 +140,7 @@ class ChatCompletionApiRequest(_ApiRequest):
         try:
             output = json.loads(response["choices"][0]["message"]["content"])
         except json.JSONDecodeError as jde:
-            # TODO: Log error
+            _logger.error(f"Request f{str(self.uuid)} could not be JSON decoded")
             output = response["choices"][0]["message"]["content"]
         return {
             "uuid": str(self.uuid),

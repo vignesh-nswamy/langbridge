@@ -2,7 +2,9 @@ import asyncio
 import time
 from asyncio import Queue
 from pathlib import Path
-from typing import Iterator, List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any
+
+import openai
 from pydantic import BaseModel, Field, validator
 
 from openai_processor.trackers.statustracker import ApiStatusTracker
@@ -11,9 +13,12 @@ from openai_processor.api_requests.api_requests import (
     ChatCompletionApiRequest
 )
 from openai_processor.utils import get_logger
+from openai_processor.settings import get_openai_settings
 
 
 _logger = get_logger()
+_settings = get_openai_settings()
+openai.api_key = _settings.openai_key
 
 
 class RequestsHandler(BaseModel):
