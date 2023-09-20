@@ -1,5 +1,6 @@
 import json
 import asyncio
+import logging
 from pathlib import Path
 from typing import *
 
@@ -9,12 +10,20 @@ from pydantic import Field, create_model
 from rich import box
 from rich.console import Console
 from rich.panel import Panel
+from rich.logging import RichHandler
 
 from openai_processor.api_requests import ChatCompletionApiRequest
 from openai_processor.handlers import ChatRequestHandler
 from openai_processor.model_params import ChatModelParams
 
 console = Console(width=100)
+
+logging.basicConfig(
+    level="NOTSET",
+    handlers=[
+        RichHandler(level="INFO", console=console, rich_tracebacks=True)
+    ]
+)
 
 
 def process(
