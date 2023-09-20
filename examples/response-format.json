@@ -1,0 +1,10 @@
+{
+    "answer": {
+        "type": "Literal[\"True\", \"False\"]",
+        "description": "Whether the statement is True or False"
+    },
+    "reason": {
+        "type": "str",
+        "description": "A detailed reason why the statement is True or False"
+    }
+}
