@@ -97,7 +97,8 @@ def process(
     handler = ChatRequestHandler(
         api_requests=api_requests,
         max_requests_per_minute=max_requests_per_minute,
-        max_tokens_per_minute=max_tokens_per_minute
+        max_tokens_per_minute=max_tokens_per_minute,
+        outfile=outfile
     )
 
     _ = typer.confirm(
@@ -112,10 +113,6 @@ def process(
         console=console
     ) as progress:
         progress.add_task(description="Initiating API calls and waiting for responses...")
-        responses = asyncio.run(
+        asyncio.run(
             handler.execute()
         )
-
-    with open(outfile, "w") as outf:
-        for r in responses:
-            outf.write(f"{json.dumps(r)}\n")

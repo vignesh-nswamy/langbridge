@@ -1,6 +1,7 @@
 import asyncio
 import time
 from asyncio import Queue
+from pathlib import Path
 from typing import Iterator, List, Optional, Dict, Any
 from pydantic import BaseModel, Field, validator
 
@@ -21,6 +22,7 @@ class RequestsHandler(BaseModel):
     max_tokens_per_minute: int
     status_tracker: ApiStatusTracker = Field(default=ApiStatusTracker())
     retry_queue: Queue = Field(default=Queue())
+    outfile: Optional[Path]
     # TODO: Make the fields below read-only
     total_requests: Optional[int]
     total_tokens: Optional[int]
@@ -97,7 +99,8 @@ class RequestsHandler(BaseModel):
                         asyncio.create_task(
                             next_request.initiate(
                                 retry_queue=self.retry_queue,
-                                statustracker=self.status_tracker
+                                statustracker=self.status_tracker,
+                                outfile=self.outfile
                             )
                         )
                     )
@@ -117,9 +120,9 @@ class RequestsHandler(BaseModel):
                     rate_limit_pause - seconds_since_rate_limit_error
                 )
 
-        results = await asyncio.gather(*tasks)
-
-        return results
+        if not self.outfile:
+            results = await asyncio.gather(*tasks)
+            return results
 
 
 class ChatRequestHandler(RequestsHandler):

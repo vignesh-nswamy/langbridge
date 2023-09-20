@@ -1,6 +1,7 @@
 import time
 import json
 import asyncio
+from pathlib import Path
 from uuid import uuid4, UUID
 from typing import Dict, Any, Optional
 
@@ -72,7 +73,8 @@ class _ApiRequest(BaseModel):
     async def initiate(
         self,
         retry_queue: asyncio.Queue,
-        statustracker: ApiStatusTracker
+        statustracker: ApiStatusTracker,
+        outfile: Optional[Path] = None
     ):
         error = False
         try:
@@ -112,7 +114,12 @@ class _ApiRequest(BaseModel):
             statustracker.num_tasks_in_progress -= 1
             statustracker.num_tasks_succeeded += 1
 
-            return self._post_process(response)
+            processed_response = self._post_process(response)
+            if outfile:
+                with open(outfile, "a") as outf:
+                    outf.write(json.dumps(processed_response) + "\n")
+            else:
+                return processed_response
 
 
 class ChatCompletionApiRequest(_ApiRequest):
