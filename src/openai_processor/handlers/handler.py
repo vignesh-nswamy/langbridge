@@ -31,6 +31,7 @@ class RequestsHandler(BaseModel):
     # TODO: Make the fields below read-only
     total_requests: Optional[int]
     total_tokens: Optional[int]
+    total_cost: Optional[float]
 
     @validator("total_requests", always=True)
     def compute_total_requests(cls, _, values: Dict[str, Any]):
@@ -38,11 +39,16 @@ class RequestsHandler(BaseModel):
 
     @validator("total_tokens", always=True)
     def compute_total_tokens(cls, _, values: Dict[str, Any]):
-        api_requests = values["api_requests"]
-
         return sum([
             r.consumption.num_total_tokens
-            for r in api_requests
+            for r in values["api_requests"]
+        ])
+
+    @validator("total_cost", always=True)
+    def compute_total_cost(cls, _, values: Dict[str, Any]):
+        return sum([
+            r.consumption.total_cost
+            for r in values["api_requests"]
         ])
 
     class Config:
