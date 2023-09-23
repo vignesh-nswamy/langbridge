@@ -1,7 +1,10 @@
 import asyncio
 import time
 from asyncio import Queue
-from typing import Iterator, List, Optional, Dict, Any
+from pathlib import Path
+from typing import List, Optional, Dict, Any
+
+import openai
 from pydantic import BaseModel, Field, validator
 
 from openai_processor.trackers.statustracker import ApiStatusTracker
@@ -10,9 +13,12 @@ from openai_processor.api_requests.api_requests import (
     ChatCompletionApiRequest
 )
 from openai_processor.utils import get_logger
+from openai_processor.settings import get_openai_settings
 
 
 _logger = get_logger()
+_settings = get_openai_settings()
+openai.api_key = _settings.openai_key
 
 
 class RequestsHandler(BaseModel):
@@ -21,9 +27,11 @@ class RequestsHandler(BaseModel):
     max_tokens_per_minute: int
     status_tracker: ApiStatusTracker = Field(default=ApiStatusTracker())
     retry_queue: Queue = Field(default=Queue())
+    outfile: Optional[Path]
     # TODO: Make the fields below read-only
     total_requests: Optional[int]
     total_tokens: Optional[int]
+    total_cost: Optional[float]
 
     @validator("total_requests", always=True)
     def compute_total_requests(cls, _, values: Dict[str, Any]):
@@ -31,11 +39,16 @@ class RequestsHandler(BaseModel):
 
     @validator("total_tokens", always=True)
     def compute_total_tokens(cls, _, values: Dict[str, Any]):
-        api_requests = values["api_requests"]
-
         return sum([
             r.consumption.num_total_tokens
-            for r in api_requests
+            for r in values["api_requests"]
+        ])
+
+    @validator("total_cost", always=True)
+    def compute_total_cost(cls, _, values: Dict[str, Any]):
+        return sum([
+            r.consumption.total_cost
+            for r in values["api_requests"]
         ])
 
     class Config:
@@ -97,7 +110,8 @@ class RequestsHandler(BaseModel):
                         asyncio.create_task(
                             next_request.initiate(
                                 retry_queue=self.retry_queue,
-                                statustracker=self.status_tracker
+                                statustracker=self.status_tracker,
+                                outfile=self.outfile
                             )
                         )
                     )
@@ -117,9 +131,9 @@ class RequestsHandler(BaseModel):
                     rate_limit_pause - seconds_since_rate_limit_error
                 )
 
-        results = await asyncio.gather(*tasks)
-
-        return results
+        if not self.outfile:
+            results = await asyncio.gather(*tasks)
+            return results
 
 
 class ChatRequestHandler(RequestsHandler):

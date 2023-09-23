@@ -97,12 +97,15 @@ def process(
     handler = ChatRequestHandler(
         api_requests=api_requests,
         max_requests_per_minute=max_requests_per_minute,
-        max_tokens_per_minute=max_tokens_per_minute
+        max_tokens_per_minute=max_tokens_per_minute,
+        outfile=outfile
     )
 
     _ = typer.confirm(
         f"{handler.total_requests} requests are scheduled, "
-        f"collectively containing {handler.total_tokens} tokens. Proceed?",
+        f"collectively containing {handler.total_tokens} tokens."
+        f"Total approximate cost is ${round(handler.total_cost, 2)}."
+        f" Proceed?",
         abort=True
     )
     with rich.progress.Progress(
@@ -112,10 +115,6 @@ def process(
         console=console
     ) as progress:
         progress.add_task(description="Initiating API calls and waiting for responses...")
-        responses = asyncio.run(
+        asyncio.run(
             handler.execute()
         )
-
-    with open(outfile, "w") as outf:
-        for r in responses:
-            outf.write(f"{json.dumps(r)}\n")
