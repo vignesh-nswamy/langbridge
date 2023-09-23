@@ -104,7 +104,7 @@ def process(
     _ = typer.confirm(
         f"{handler.total_requests} requests are scheduled, "
         f"collectively containing {handler.total_tokens} tokens."
-        f"Total approximate cost is {round(handler.total_cost, 2)}."
+        f"Total approximate cost is ${round(handler.total_cost, 2)}."
         f" Proceed?",
         abort=True
     )
