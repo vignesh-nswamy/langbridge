@@ -8,28 +8,27 @@ from typing import Dict, Any, Optional
 import openai
 
 from pydantic.main import ModelMetaclass
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import BaseModel, Field, validator
 
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import PromptTemplate
 
 from openai_processor.utils import get_logger
+from openai_processor.model_params import BaseModelParams
 from openai_processor.trackers import ApiStatusTracker, ApiConsumptionTracker
-from openai_processor.model_params.params import ChatModelParams, EmbeddingModelParams, _ModelParams
 
 
 _logger = get_logger()
 
 
-class _ApiRequest(BaseModel):
+class BaseApiAgent(BaseModel):
     uuid: UUID = Field(default_factory=uuid4)
     text: str
     response_model: Optional[ModelMetaclass]
     prompt: Optional[str]
+    model_params: BaseModelParams
     max_attempts: int = Field(default=5)
     metadata: Optional[Dict[str, Any]]
-    # Variables that should be overriden
-    model_params: _ModelParams
     # TODO: Make the fields below read-only
     input: Optional[str]
     consumption: Optional[ApiConsumptionTracker]
@@ -70,7 +69,7 @@ class _ApiRequest(BaseModel):
     def _post_process(self, response):
         raise NotImplemented
 
-    async def initiate(
+    async def invoke(
         self,
         retry_queue: asyncio.Queue,
         statustracker: ApiStatusTracker,
@@ -120,68 +119,3 @@ class _ApiRequest(BaseModel):
                     outf.write(json.dumps(processed_response) + "\n")
             else:
                 return processed_response
-
-
-class ChatCompletionApiRequest(_ApiRequest):
-    model_params: ChatModelParams
-
-    async def _call_api(self):
-        return await openai.ChatCompletion.acreate(
-            messages=[
-                {
-                    "role": "user",
-                    "content": self.input
-                }
-            ],
-            **self.model_params.dict()
-        )
-
-    def _post_process(self, response):
-        # Update consumption stats
-        self.consumption = self.consumption.parse_obj(
-            {
-                **self.consumption.dict(),
-                "num_max_output_tokens": response["usage"]["completion_tokens"]
-            }
-        )
-
-        try:
-            output = json.loads(response["choices"][0]["message"]["content"])
-        except json.JSONDecodeError as jde:
-            _logger.error(f"Request f{str(self.uuid)} could not be JSON decoded")
-            output = response["choices"][0]["message"]["content"]
-        return {
-            "metadata": self.metadata,
-            "output": output,
-            "tokens_consumed": response["usage"],
-            "total_cost": self.consumption.total_cost,
-            "uuid": str(self.uuid)
-        }
-
-    @validator("consumption", pre=True, always=True)
-    def compute_consumption(cls, _, values: Dict[str, Any]) -> ApiConsumptionTracker:
-        model_params: ChatModelParams = values["model_params"]
-        response_tokens = model_params.max_tokens
-
-        request_tokens = (
-            4  # every message follows <im_start>{role/name}\n{content}<im_end>\n
-            + len(model_params.encoding.encode(values["input"]))
-            + 2  # every reply is primed with <im_start>assistant
-        )
-
-        return ApiConsumptionTracker(
-            model_name=model_params.model,
-            num_input_tokens=request_tokens,
-            num_max_output_tokens=response_tokens
-        )
-
-
-class EmbeddingApiRequest(_ApiRequest):
-    model_params: EmbeddingModelParams
-
-    @root_validator(pre=True)
-    def check_prompt_response_templates_omitted(cls, values: Dict[str, Any]):
-        if "prompt" in values:
-            raise ValueError("Embedding Model does not allow `prompt`")
-        if "response_model" in values:
-            raise ValueError("Embedding Model does not allow `response_model`")
