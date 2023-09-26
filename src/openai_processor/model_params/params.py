@@ -5,7 +5,7 @@ import tiktoken
 from pydantic import BaseModel, Field, validator
 
 
-class _ModelParams(BaseModel):
+class BaseModelParams(BaseModel):
     model: str
     encoding: Optional[tiktoken.Encoding] = Field(exclude=True)
 
@@ -19,19 +19,19 @@ class _ModelParams(BaseModel):
         arbitrary_types_allowed = True
 
 
-class ChatModelParams(_ModelParams):
-    temperature: float = Field(default=0, le=2, ge=0)
+class ChatModelParams(BaseModelParams):
+    temperature: float = Field(default=0, le=1, ge=0)
     top_p: float = Field(default=1)
     n: int = Field(default=1)
     # `max_tokens` capped at 4000. Default for the OpenAI API is inf
-    max_tokens: int = Field(default=4000)
+    max_tokens: int = Field(default=1000)
     presence_penalty: float = Field(default=0, le=2, ge=-2)
     frequency_penalty: float = Field(default=0, le=2, ge=-2)
 
 
-class CompletionModelParams(_ModelParams):
+class CompletionModelParams(BaseModelParams):
     pass
 
 
-class EmbeddingModelParams(_ModelParams):
+class EmbeddingModelParams(BaseModelParams):
     pass

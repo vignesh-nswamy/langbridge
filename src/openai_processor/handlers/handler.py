@@ -2,16 +2,14 @@ import asyncio
 import time
 from asyncio import Queue
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Union
 
 import openai
 from pydantic import BaseModel, Field, validator
 
 from openai_processor.trackers.statustracker import ApiStatusTracker
-from openai_processor.api_requests.api_requests import (
-    _ApiRequest,
-    ChatCompletionApiRequest
-)
+from openai_processor.api_agents import BaseApiAgent
+from openai_processor.api_agents.chat import ChatCompletionApiAgent
 from openai_processor.utils import get_logger
 from openai_processor.settings import get_openai_settings
 
@@ -22,7 +20,7 @@ openai.api_key = _settings.openai_key
 
 
 class RequestsHandler(BaseModel):
-    api_requests: List[_ApiRequest]
+    api_requests: List[BaseApiAgent]
     max_requests_per_minute: int
     max_tokens_per_minute: int
     status_tracker: ApiStatusTracker = Field(default=ApiStatusTracker())
@@ -62,7 +60,7 @@ class RequestsHandler(BaseModel):
         rate_limit_pause = 15
         loop_sleep = 0.001
 
-        next_request: _ApiRequest = None
+        next_request: BaseApiAgent = None
 
         available_request_capacity = self.max_requests_per_minute
         available_token_capacity = self.max_tokens_per_minute
@@ -108,7 +106,7 @@ class RequestsHandler(BaseModel):
 
                     tasks.append(
                         asyncio.create_task(
-                            next_request.initiate(
+                            next_request.invoke(
                                 retry_queue=self.retry_queue,
                                 statustracker=self.status_tracker,
                                 outfile=self.outfile
@@ -137,4 +135,4 @@ class RequestsHandler(BaseModel):
 
 
 class ChatRequestHandler(RequestsHandler):
-    api_requests: List[ChatCompletionApiRequest]
+    api_requests: List[ChatCompletionApiAgent]

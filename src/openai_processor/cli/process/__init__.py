@@ -12,7 +12,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.logging import RichHandler
 
-from openai_processor.api_requests import ChatCompletionApiRequest
+from openai_processor.api_agents.chat import ChatCompletionApiAgent
 from openai_processor.handlers import ChatRequestHandler
 from openai_processor.model_params import ChatModelParams
 
@@ -83,7 +83,7 @@ def process(
         )
 
     api_requests = [
-        ChatCompletionApiRequest(
+        ChatCompletionApiAgent(
             text=line.pop("text"),
             metadata={"index": i, **line},
             prompt=prompt,
@@ -118,3 +118,4 @@ def process(
         asyncio.run(
             handler.execute()
         )
+
