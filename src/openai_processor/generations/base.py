@@ -40,7 +40,7 @@ class Generation(InitialGeneration):
         arbitrary_types_allowed = True
         allow_mutation = True
 
-    # TODO: Don't use `root_validator` for resolving `prompt`
+    # TODO: Don't use `root_validator` for resolving `prompt` and `model`
     @root_validator(pre=True)
     def root(cls, values):
         base_prompt = values.get("base_prompt")
@@ -62,6 +62,8 @@ class Generation(InitialGeneration):
         else:
             values["prompt"] = values["input"]
 
+        values["model"] = values["model_parameters"].model
+
         return values
 
     @validator("id", pre=True, always=True)
@@ -72,7 +74,7 @@ class Generation(InitialGeneration):
     def resolve_model(cls, v, values: Dict[str, Any]) -> str:
         return v if v else values["model_parameters"].model
 
-    async def _update_trace(self):
+    def _update_trace(self):
         if self.trace is not None:
             self.trace.generation(
                 self
@@ -123,7 +125,7 @@ class Generation(InitialGeneration):
                 retry_queue.put_nowait(self)
             else:
                 self.status_message = "Error"
-                await self._update_trace()
+                self._update_trace()
 
                 statustracker.num_tasks_in_progress -= 1
                 statustracker.num_tasks_failed += 1
@@ -144,7 +146,7 @@ class ChatGeneration(Generation):
 
     async def _call_api(self):
         self.status_message = "Initiated"
-        await self._update_trace()
+        self._update_trace()
 
         return await openai.ChatCompletion.acreate(
             messages=[
@@ -166,7 +168,7 @@ class ChatGeneration(Generation):
 
         self.completion = response["choices"][0]["message"]["content"]
         self.status_message = "Done"
-        await self._update_trace()
+        self._update_trace()
 
         try:
             output = json.loads(self.completion)

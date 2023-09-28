@@ -19,7 +19,7 @@ openai.api_key = _settings.openai_key
 
 
 class RequestsHandler(BaseModel):
-    api_requests: List[Generation]
+    generations: List[Generation]
     max_requests_per_minute: int
     max_tokens_per_minute: int
     status_tracker: ProgressTracker = Field(default=ProgressTracker())
@@ -32,20 +32,20 @@ class RequestsHandler(BaseModel):
 
     @validator("total_requests", always=True)
     def compute_total_requests(cls, _, values: Dict[str, Any]):
-        return len(values["api_requests"])
+        return len(values["generations"])
 
     @validator("total_tokens", always=True)
     def compute_total_tokens(cls, _, values: Dict[str, Any]):
         return sum([
             r.usage.total_tokens
-            for r in values["api_requests"]
+            for r in values["generations"]
         ])
 
     @validator("total_cost", always=True)
     def compute_total_cost(cls, _, values: Dict[str, Any]):
         return sum([
             r.usage.total_cost
-            for r in values["api_requests"]
+            for r in values["generations"]
         ])
 
     class Config:
@@ -54,7 +54,7 @@ class RequestsHandler(BaseModel):
     async def execute(
         self
     ):
-        requests_iterator = iter(self.api_requests)
+        requests_iterator = iter(self.generations)
 
         rate_limit_pause = 15
         loop_sleep = 0.001
@@ -134,4 +134,4 @@ class RequestsHandler(BaseModel):
 
 
 class ChatRequestHandler(RequestsHandler):
-    api_requests: List[ChatGeneration]
+    generations: List[ChatGeneration]

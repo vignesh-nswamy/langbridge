@@ -19,6 +19,7 @@ from openai_processor.generations import ChatGeneration
 from openai_processor.handlers import ChatRequestHandler
 from openai_processor.model_params import ChatModelParams
 from openai_processor.settings import get_langfuse_settings
+from openai_processor.utils import get_logger
 
 console = Console(width=100)
 
@@ -28,8 +29,10 @@ logging.basicConfig(
         RichHandler(level="INFO", console=console, rich_tracebacks=True)
     ]
 )
+_logger = get_logger()
+
 _langfuse_settings = get_langfuse_settings()
-langfuse = Langfuse(
+_langfuse = Langfuse(
     host=_langfuse_settings.host,
     secret_key=_langfuse_settings.secret_key,
     public_key=_langfuse_settings.public_key
@@ -93,11 +96,11 @@ def process(
             **fields
         )
 
-    trace = langfuse.trace(
-        CreateTrace(id="8da76bad-60c8-488d-8982-6ab4efac2b36", name=trace_name)
+    trace = _langfuse.trace(
+        CreateTrace(name=trace_name)
     ) if trace_name else None
 
-    api_requests = [
+    generations = [
         ChatGeneration(
             input=line.pop("text"),
             metadata={"index": i, **line},
@@ -111,7 +114,7 @@ def process(
     ]
 
     handler = ChatRequestHandler(
-        api_requests=api_requests,
+        generations=generations,
         max_requests_per_minute=max_requests_per_minute,
         max_tokens_per_minute=max_tokens_per_minute,
         outfile=outfile
@@ -135,17 +138,5 @@ def process(
             handler.execute()
         )
 
-
-if __name__ == "__main__":
-    process(
-        model="gpt-3.5-turbo",
-        infile="/Users/vnaray/Projects/openai-processor/examples/input.jsonl",
-        outfile="/Users/vnaray/Projects/openai-processor/examples/output.jsonl",
-        prompt_file="/Users/vnaray/Projects/openai-processor/examples/prompt.txt",
-        response_format_file="/Users/vnaray/Projects/openai-processor/examples/response-format.json",
-        max_response_tokens=100,
-        max_requests_per_minute=100,
-        max_tokens_per_minute=39500,
-        max_attempts_per_request=3,
-        trace_name="openai-processor-test"
-    )
+    _logger.info("All responses have been written. Waiting for langfuse to finish logging...")
+    _langfuse.flush()
