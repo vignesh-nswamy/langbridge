@@ -7,9 +7,8 @@ from typing import List, Optional, Dict, Any, Union
 import openai
 from pydantic import BaseModel, Field, validator
 
-from openai_processor.trackers.statustracker import ApiStatusTracker
-from openai_processor.api_agents import BaseApiAgent
-from openai_processor.api_agents.chat import ChatCompletionApiAgent
+from openai_processor.trackers import ProgressTracker
+from openai_processor.generations import Generation, ChatGeneration
 from openai_processor.utils import get_logger
 from openai_processor.settings import get_openai_settings
 
@@ -20,10 +19,10 @@ openai.api_key = _settings.openai_key
 
 
 class RequestsHandler(BaseModel):
-    api_requests: List[BaseApiAgent]
+    api_requests: List[Generation]
     max_requests_per_minute: int
     max_tokens_per_minute: int
-    status_tracker: ApiStatusTracker = Field(default=ApiStatusTracker())
+    status_tracker: ProgressTracker = Field(default=ProgressTracker())
     retry_queue: Queue = Field(default=Queue())
     outfile: Optional[Path]
     # TODO: Make the fields below read-only
@@ -38,14 +37,14 @@ class RequestsHandler(BaseModel):
     @validator("total_tokens", always=True)
     def compute_total_tokens(cls, _, values: Dict[str, Any]):
         return sum([
-            r.consumption.num_total_tokens
+            r.usage.total_tokens
             for r in values["api_requests"]
         ])
 
     @validator("total_cost", always=True)
     def compute_total_cost(cls, _, values: Dict[str, Any]):
         return sum([
-            r.consumption.total_cost
+            r.usage.total_cost
             for r in values["api_requests"]
         ])
 
@@ -60,7 +59,7 @@ class RequestsHandler(BaseModel):
         rate_limit_pause = 15
         loop_sleep = 0.001
 
-        next_request: BaseApiAgent = None
+        next_request: Generation = None
 
         available_request_capacity = self.max_requests_per_minute
         available_token_capacity = self.max_tokens_per_minute
@@ -97,7 +96,7 @@ class RequestsHandler(BaseModel):
             last_update_time = current_time
 
             if next_request:
-                next_request_tokens = next_request.consumption.num_total_tokens
+                next_request_tokens = next_request.usage.total_tokens
 
                 if available_request_capacity >= 1 and available_token_capacity >= next_request_tokens:
                     available_request_capacity -= 1
@@ -135,4 +134,4 @@ class RequestsHandler(BaseModel):
 
 
 class ChatRequestHandler(RequestsHandler):
-    api_requests: List[ChatCompletionApiAgent]
+    api_requests: List[ChatGeneration]

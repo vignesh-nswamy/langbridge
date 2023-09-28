@@ -12,9 +12,13 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.logging import RichHandler
 
-from openai_processor.api_agents.chat import ChatCompletionApiAgent
+from langfuse import Langfuse
+from langfuse.model import CreateTrace
+
+from openai_processor.generations import ChatGeneration
 from openai_processor.handlers import ChatRequestHandler
 from openai_processor.model_params import ChatModelParams
+from openai_processor.settings import get_langfuse_settings
 
 console = Console(width=100)
 
@@ -23,6 +27,12 @@ logging.basicConfig(
     handlers=[
         RichHandler(level="INFO", console=console, rich_tracebacks=True)
     ]
+)
+_langfuse_settings = get_langfuse_settings()
+langfuse = Langfuse(
+    host=_langfuse_settings.host,
+    secret_key=_langfuse_settings.secret_key,
+    public_key=_langfuse_settings.public_key
 )
 
 
@@ -37,7 +47,8 @@ def process(
     max_response_tokens: int = typer.Option(help="Maximum response context length"),
     max_requests_per_minute: int = typer.Option(default=100, help="Maximum number of requests per minute"),
     max_tokens_per_minute: int = typer.Option(default=39500, help="Maximum number of tokens per minute"),
-    max_attempts_per_request: int = typer.Option(default=5, help="Maximum number of attempts per request")
+    max_attempts_per_request: int = typer.Option(default=5, help="Maximum number of attempts per request"),
+    trace_name: Optional[str] = typer.Option(default=None, help="Langfuse trace name. If not provided, trace will not be used to track generations")
 ):
     console.print(
         Panel(
@@ -82,14 +93,19 @@ def process(
             **fields
         )
 
+    trace = langfuse.trace(
+        CreateTrace(id="8da76bad-60c8-488d-8982-6ab4efac2b36", name=trace_name)
+    ) if trace_name else None
+
     api_requests = [
-        ChatCompletionApiAgent(
-            text=line.pop("text"),
+        ChatGeneration(
+            input=line.pop("text"),
             metadata={"index": i, **line},
-            prompt=prompt,
+            base_prompt=prompt,
             response_model=response_model,
-            model_params=model_params,
-            max_attempts=max_attempts_per_request
+            model_parameters=model_params,
+            max_attempts=max_attempts_per_request,
+            trace=trace
         )
         for i, line in enumerate(lines)
     ]
@@ -119,3 +135,17 @@ def process(
             handler.execute()
         )
 
+
+if __name__ == "__main__":
+    process(
+        model="gpt-3.5-turbo",
+        infile="/Users/vnaray/Projects/openai-processor/examples/input.jsonl",
+        outfile="/Users/vnaray/Projects/openai-processor/examples/output.jsonl",
+        prompt_file="/Users/vnaray/Projects/openai-processor/examples/prompt.txt",
+        response_format_file="/Users/vnaray/Projects/openai-processor/examples/response-format.json",
+        max_response_tokens=100,
+        max_requests_per_minute=100,
+        max_tokens_per_minute=39500,
+        max_attempts_per_request=3,
+        trace_name="openai-processor-test"
+    )

@@ -1,5 +1,2 @@
-from .settings import OpenAiSettings
-
-
-def get_openai_settings() -> OpenAiSettings:
-    return OpenAiSettings()
+from .langfuse import get_langfuse_settings
+from .openai import get_openai_settings
