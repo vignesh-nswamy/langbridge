@@ -13,7 +13,8 @@ openai-processor process --model gpt-4 \
   --outfile ./examples/output.jsonl \
   --prompt-file ./examples/prompt.txt \
   --response-format-file ./examples/response-format.json \
-  --max-response-tokens 300 \
+  --max-response-tokens 75 \
   --max-requests-per-minute 100 \
   --max-tokens-per-minute 39500 \
-  --max-attempts-per-request 3
+  --max-attempts-per-request 3 \
+  --trace-name openai-processor-test

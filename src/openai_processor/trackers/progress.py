@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 
 @dataclass
-class ApiStatusTracker:
+class ProgressTracker:
     """
     Stores metadata about the progress of API calls.
     """
