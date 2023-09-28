@@ -1,5 +1,6 @@
 import uuid
 import time
+from datetime import datetime as dt
 import json
 import asyncio
 from pathlib import Path
@@ -95,6 +96,7 @@ class Generation(InitialGeneration):
         error = False
         try:
             response = await self._call_api()
+            self.end_time = dt.now()
         except openai.error.APIError as ae:
             error = True
             statustracker.num_api_errors += 1
