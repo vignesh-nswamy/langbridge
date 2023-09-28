@@ -1,3 +1,6 @@
+import uuid
+from hashlib import sha1
+
 import json
 import asyncio
 import logging
@@ -97,7 +100,17 @@ def process(
         )
 
     trace = _langfuse.trace(
-        CreateTrace(name=trace_name)
+        CreateTrace(
+            id=str(
+                uuid.UUID(
+                    bytes=sha1(
+                        str.encode(trace_name)
+                    ).digest()[:16],
+                    version=4
+                )
+            ),
+            name=trace_name
+        )
     ) if trace_name else None
 
     generations = [
