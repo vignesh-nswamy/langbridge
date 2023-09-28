@@ -22,13 +22,31 @@ class RequestsHandler(BaseModel):
     generations: List[Generation]
     max_requests_per_minute: int
     max_tokens_per_minute: int
-    status_tracker: ProgressTracker = Field(default=ProgressTracker())
+    progress_tracker: ProgressTracker = Field(default=ProgressTracker())
     retry_queue: Queue = Field(default=Queue())
     outfile: Optional[Path]
     # TODO: Make the fields below read-only
     total_requests: Optional[int]
     total_tokens: Optional[int]
     total_cost: Optional[float]
+
+    """
+    This is a RequestsHandler to handle parallel OpenAI generation requests.
+    The Responsibilities of RequestsHandler class include:
+    - Initiating multiple requests.
+    - Keeping a track of the progress of every operation.
+    - Keeping a track of every retry operation.
+    - Optionally outputting the results of every operation to the specified path.
+    - Limiting the frequency of the requests to not violate the max requests per minute threshold.
+    - Regulating the consumption of tokens to not exceed the max tokens per minute limit.
+    - Considering each 'Generation' as an API call/request made and processing it individually.
+
+    Note:
+    - If no outfile path is provided, the results of the API calls will be directly returned.
+    - If an outfile path is provided, the results of the API calls are stored at the specified location.
+    - The maximum number of requests and tokens allowed per minute are specified during the class initialization.
+    - A rate limit error will result in a pause specified by rate_limit_pause and retries will be handled accordingly.
+    """
 
     @validator("total_requests", always=True)
     def compute_total_requests(cls, _, values: Dict[str, Any]):
@@ -54,6 +72,20 @@ class RequestsHandler(BaseModel):
     async def execute(
         self
     ):
+        """
+        This is an asynchronous method that executes the various requests stored in the 'generations' attribute of
+        the RequestsHandler class.
+
+        Process Flow:
+        - Checks which request needs to be processed next: a request from the retry queue or a new request.
+        - Then, it calculates the available_request_capacity and available_token_capacity based on the time passed since the last update.
+        - If there is available capacity, the method proceeds to process the next request and decreases the available capacities accordingly.
+        - If a rate limit error is encountered, the method pauses for the time denoted by rate_limit_pause and then re-attempts the failed request.
+        - This process continues until all requests have been processed.
+
+        Returns:
+            The results of all API calls as a list if no outfile path is provided. Otherwise, it saves the results to the specified outfile path and returns None.
+        """
         requests_iterator = iter(self.generations)
 
         rate_limit_pause = 15
@@ -76,8 +108,8 @@ class RequestsHandler(BaseModel):
                 elif not all_requests_exhausted:
                     try:
                         next_request = next(requests_iterator)
-                        self.status_tracker.num_tasks_in_progress += 1
-                        self.status_tracker.num_tasks_initiated += 1
+                        self.progress_tracker.num_tasks_in_progress += 1
+                        self.progress_tracker.num_tasks_initiated += 1
                     except StopIteration:
                         _logger.info("All API calls have been initiated. Waiting for responses...")
                         all_requests_exhausted = True
@@ -107,7 +139,7 @@ class RequestsHandler(BaseModel):
                         asyncio.create_task(
                             next_request.invoke(
                                 retry_queue=self.retry_queue,
-                                statustracker=self.status_tracker,
+                                progress_tracker=self.progress_tracker,
                                 outfile=self.outfile
                             )
                         )
@@ -115,14 +147,14 @@ class RequestsHandler(BaseModel):
                     # Reset `next_request` to None
                     next_request = None
 
-            if self.status_tracker.num_tasks_in_progress == 0:
+            if self.progress_tracker.num_tasks_in_progress == 0:
                 break
 
             # Main loop sleeps briefly so concurrent tasks can run
             await asyncio.sleep(loop_sleep)
 
             # If a rate limit error was thrown, pause to cool down
-            seconds_since_rate_limit_error = time.time() - self.status_tracker.time_last_rate_limit_error
+            seconds_since_rate_limit_error = time.time() - self.progress_tracker.time_last_rate_limit_error
             if seconds_since_rate_limit_error < rate_limit_pause:
                 await asyncio.sleep(
                     rate_limit_pause - seconds_since_rate_limit_error
@@ -134,4 +166,7 @@ class RequestsHandler(BaseModel):
 
 
 class ChatRequestHandler(RequestsHandler):
+    """
+    A type of RequestHandler specifically for handling requests to OpenAI Chat models
+    """
     generations: List[ChatGeneration]

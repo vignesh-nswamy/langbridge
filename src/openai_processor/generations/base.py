@@ -9,13 +9,13 @@ from typing import Dict, Any, List, Optional, Literal
 import openai
 
 from pydantic.main import ModelMetaclass
-from pydantic import BaseModel, Field, validator, root_validator
+from pydantic import Field, validator, root_validator
 
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import PromptTemplate
 
 from langfuse.client import StatefulTraceClient
-from langfuse.model import CreateGeneration, InitialGeneration
+from langfuse.model import InitialGeneration
 
 from openai_processor.utils import get_logger
 from openai_processor.model_params import BaseModelParams, ChatModelParams
@@ -26,6 +26,24 @@ _logger = get_logger()
 
 
 class Generation(InitialGeneration):
+    """
+    The `Generation` class is used for handling the entire lifecycle of interacting with OpenAI models. It performs the following core tasks:
+
+    - Pre-process Inputs: It transforms the raw inputs into formatted prompts that the model can understand.
+    If response schemas are provided, they will be incorporated into this process.
+
+    - Manage Responses: It handles the responses obtained from OpenAI models.
+    This includes error handling for different types of API errors and providing appropriate retry mechanisms.
+
+    - Post-process Outputs: After receiving a response from an OpenAI model, it performs necessary transformations
+    which may include parsing the response according to a schema, performing some validations or any other business logic needed.
+
+    - Persist Outputs: It provides mechanisms to save the outputs to a file on disk.
+    This is especially useful for large jobs where persisting results immediately is important.
+
+    - Log Outputs: It logs the outputs to the Langfuse trace system.
+    This can be used for debugging or tracking the progress.
+    """
     id: str = Field(default_factory=uuid.uuid4)
     model_parameters: BaseModelParams
     response_model: Optional[ModelMetaclass]
@@ -90,26 +108,45 @@ class Generation(InitialGeneration):
     async def invoke(
         self,
         retry_queue: asyncio.Queue,
-        statustracker: ProgressTracker,
+        progress_tracker: ProgressTracker,
         outfile: Optional[Path] = None
     ):
+        """
+        Async method to initiate the calling of the API for a text generation task and
+        manage error handling and retries. It performs post-processing on the response,
+        updates the task status, and writes the result to an outfile if one is provided.
+
+        Args:
+            retry_queue (asyncio.Queue): A queue object to manage tasks retry in case of API errors.
+            progress_tracker (ProgressTracker): A tracker object to keep track of the progress of asynchronous tasks.
+            outfile (Optional[Path], optional): Outfile path where the result has to be written. Defaults to None.
+
+        Raises:
+            openai.error.APIConnectionError
+            openai.error.InvalidRequestError
+            openai.error.AuthenticationError
+            openai.error.PermissionError: Reraised exceptions from calling the OpenAI API.
+
+        Returns:
+            processed_response: The processed response of the text generation task if no outfile path is provided.
+        """
         error = False
         try:
             response = await self._call_api()
             self.end_time = dt.now()
         except openai.error.APIError as ae:
             error = True
-            statustracker.num_api_errors += 1
+            progress_tracker.num_api_errors += 1
         except openai.error.RateLimitError as re:
             error = True
-            statustracker.time_last_rate_limit_error = time.time()
-            statustracker.num_rate_limit_errors += 1
+            progress_tracker.time_last_rate_limit_error = time.time()
+            progress_tracker.num_rate_limit_errors += 1
         except openai.error.Timeout as te:
             error = True
-            statustracker.num_other_errors += 1
+            progress_tracker.num_other_errors += 1
         except openai.error.ServiceUnavailableError as se:
             error = True
-            statustracker.num_api_errors += 1
+            progress_tracker.num_api_errors += 1
         except (
             openai.error.APIConnectionError,
             openai.error.InvalidRequestError,
@@ -129,11 +166,11 @@ class Generation(InitialGeneration):
                 self.status_message = "Error"
                 self._update_trace()
 
-                statustracker.num_tasks_in_progress -= 1
-                statustracker.num_tasks_failed += 1
+                progress_tracker.num_tasks_in_progress -= 1
+                progress_tracker.num_tasks_failed += 1
         else:
-            statustracker.num_tasks_in_progress -= 1
-            statustracker.num_tasks_succeeded += 1
+            progress_tracker.num_tasks_in_progress -= 1
+            progress_tracker.num_tasks_succeeded += 1
 
             processed_response = await self._post_process(response)
             if outfile:
@@ -144,9 +181,29 @@ class Generation(InitialGeneration):
 
 
 class ChatGeneration(Generation):
+    """
+    `Generation` class for interacting specifically with OpenAI Chat models.
+    """
     model_parameters: ChatModelParams
 
     async def _call_api(self):
+        """
+        Async method to call the OpenAI Chat Completion API
+
+        Raises:
+            openai.error.APIError
+            openai.error.RateLimitError
+            openai.error.Timeout
+            openai.error.ServiceUnavailableError
+            openai.error.APIConnectionError
+            openai.error.InvalidRequestError
+            openai.error.AuthenticationError
+            openai.error.PermissionError
+
+        Returns:
+            A Future object that represents the API response.
+            This object will be `await`ed on to extract the response once it is available.
+        """
         self.status_message = "Initiated"
         self._update_trace()
 

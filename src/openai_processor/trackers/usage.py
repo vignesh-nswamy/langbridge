@@ -6,6 +6,9 @@ from langchain.callbacks.openai_info import get_openai_token_cost_for_model
 
 
 class Usage(LlmUsage):
+    """
+    Represents the Usage stats of a Language Model.
+    """
     model_name: str
     prompt_cost: Optional[float]
     completion_cost: Optional[float]
