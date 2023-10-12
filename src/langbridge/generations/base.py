@@ -17,9 +17,9 @@ from langchain.prompts import PromptTemplate
 from langfuse.client import StatefulTraceClient
 from langfuse.model import InitialGeneration
 
-from openai_processor.utils import get_logger
-from openai_processor.model_params import BaseModelParams, ChatModelParams
-from openai_processor.trackers import Usage, ProgressTracker
+from langbridge.utils import get_logger
+from langbridge.model_params import BaseModelParams, ChatModelParams
+from langbridge.trackers import Usage, ProgressTracker
 
 
 _logger = get_logger()

@@ -7,10 +7,10 @@ from typing import List, Optional, Dict, Any, Union
 import openai
 from pydantic import BaseModel, Field, validator
 
-from openai_processor.trackers import ProgressTracker
-from openai_processor.generations import Generation, ChatGeneration
-from openai_processor.utils import get_logger
-from openai_processor.settings import get_openai_settings
+from langbridge.trackers import ProgressTracker
+from langbridge.generations import Generation, ChatGeneration
+from langbridge.utils import get_logger
+from langbridge.settings import get_openai_settings
 
 
 _logger = get_logger()

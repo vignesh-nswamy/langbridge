@@ -1,14 +1,14 @@
 [tool.poetry]
-name = "openai-processor"
-version = "0.1.0"
-description = "A framework to make parallel and user rate limited API calls to OpenAI"
+name = "LangBridge"
+version = "0.0.1"
+description = "A framework to make parallel and user rate limited API calls to LLM Services / APIs"
 authors = ["vignesh-nswamy"]
 license = "MIT"
 readme = "README.md"
 packages = [
-    { include = "openai_processor", from = "src" },
+    { include = "langbridge", from = "src" },
 ]
-repository = "https://github.com/vnaray/openai-processor"
+repository = "https://github.com/vnaray/langbridge"
 
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"
@@ -21,7 +21,7 @@ langchain = "^0.0.295"
 langfuse = "1.0.28"
 
 [tool.poetry.scripts]
-openai-processor = "openai_processor.cli:app"
+openai-processor = "langbridge.cli:app"
 
 
 [tool.poetry.group.dev.dependencies]

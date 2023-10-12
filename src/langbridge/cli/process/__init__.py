@@ -18,11 +18,11 @@ from rich.logging import RichHandler
 from langfuse import Langfuse
 from langfuse.model import CreateTrace
 
-from openai_processor.generations import ChatGeneration
-from openai_processor.handlers import ChatRequestHandler
-from openai_processor.model_params import ChatModelParams
-from openai_processor.settings import get_langfuse_settings
-from openai_processor.utils import get_logger
+from langbridge.generations import ChatGeneration
+from langbridge.handlers import ChatRequestHandler
+from langbridge.model_params import ChatModelParams
+from langbridge.settings import get_langfuse_settings
+from langbridge.utils import get_logger
 
 console = Console(width=100)
 
