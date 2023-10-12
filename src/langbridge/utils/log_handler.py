@@ -3,12 +3,12 @@ import logging
 
 class LogHandler:
     def __init__(self):
-        self.logger = logging.getLogger("openai-processor")
+        self.logger = logging.getLogger("LangBridge")
         self.logger.setLevel(logging.INFO)
         try:
             import rich
         except ImportError:
-            formatter = logging.Formatter(f'["openai-processor"] - %(asctime)s - %(levelname)s - %(message)s')
+            formatter = logging.Formatter(f'["LangBridge"] - %(asctime)s - %(levelname)s - %(message)s')
 
             stream_handler = logging.StreamHandler()
             stream_handler.setFormatter(formatter)
