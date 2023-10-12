@@ -56,6 +56,22 @@ def process(
     max_attempts_per_request: int = typer.Option(default=5, help="Maximum number of attempts per request"),
     trace_name: Optional[str] = typer.Option(default=None, help="Langfuse trace name. If not provided, trace will not be used to track generations")
 ):
+    """
+    This method is responsible for processing requests using the specified model via API calls. It reads input texts and 
+    optional metadata from a provided .jsonl file and builds a list of generations using the provided prompt and response format files.
+
+    Args:
+        model: Name of the model to use for API calls (default is None).
+        infile: Path to a .jsonl file containing the input texts and optional metadata. The file must exist.
+        outfile: Path to a .jsonl file where the outputs will be written.
+        prompt_file: Path to a file containing the prompt, if exists.
+        response_format_file: Path to a .jsonl file containing the response format json, if exists.
+        max_response_tokens: Maximum response context length.
+        max_requests_per_minute: Maximum number of requests per minute (default is 100).
+        max_tokens_per_minute: Maximum number of tokens per minute (default is 39500).
+        max_attempts_per_request: Maximum number of attempts per request (default is 5).
+        trace_name: Langfuse trace name. If not provided, trace will not be used to track generations.
+    """
     console.print(
         Panel(
             "[bold]Welcome to the OpenAI Processor CLI![/bold]", box=box.DOUBLE,
