@@ -3,7 +3,9 @@ A package to call OpenAI models without having to worry about rate limits. It al
 providing an interface for analytics and to track / log API calls and their costs.</br>
 </br>
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT) ![Python](https://img.shields.io/badge/python-v3.9+-blue.svg) [![Poetry](https://img.shields.io/endpoint?url=https://python-poetry.org/badge/v0.json)](https://python-poetry.org/)
+
 ---
+
 ## 🚀Getting Started
 ### 📋Prerequisites
 * Python 3.9+ 🐍
