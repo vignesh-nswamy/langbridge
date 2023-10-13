@@ -4,4 +4,6 @@ from .openai import (
     OpenAiGenerationPrompt
 )
 
+from .response import GenerationResponse
+
 from .inputs import GenerationHandlerInput
