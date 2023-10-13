@@ -22,7 +22,7 @@ langfuse = "1.0.35"
 anthropic = "0.3.11"
 
 [tool.poetry.scripts]
-openai-processor = "langbridge.cli:app"
+langbridge = "langbridge.cli:app"
 
 
 [tool.poetry.group.dev.dependencies]

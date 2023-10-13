@@ -21,13 +21,29 @@ cd langbridge
 
 Install package and dependencies
 ```bash
-poetry install --without dev
+poetry install --without dev,test
 ```
 ---
 ## 🛠 Usage
 The framework can be used both as a CLI and a standalone python package. </br>
 If you need analytics and tracking, make sure you have a LangFuse server running.</br>
 Refer to [LangFuse Docs](https://langfuse.com/docs/get-started) for more details.
+
+### 💻 As a CLI
+```bash
+export OPENAI_API_KEY=<openai_api_key>
+
+langbridge generation --service openai \
+  --model gpt-3.5-turbo \
+  --infile ./examples/input.jsonl \
+  --outfile ./examples/output.jsonl \
+  --prompt-file ./examples/prompt.txt \
+  --response-format-file ./examples/response-format.json \
+  --model-parameters '{"max_tokens": 75, "temperature": 0}' \
+  --max-requests-per-minute 100 \
+  --max-tokens-per-minute 39500 \
+  --max-attempts-per-request 3
+```
 
 ### 📦 As a Python Package
 ```python

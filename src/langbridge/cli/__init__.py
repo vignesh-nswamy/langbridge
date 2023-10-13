@@ -1,5 +1,7 @@
 import typer
 
+from .generation import generation
+
 
 app = typer.Typer()
 
@@ -12,6 +14,9 @@ def __version():
     print(f"Python version:\t\t{sys.version.split()[0]}")
 
     print(f"OS/Arch:\t\t{platform.system().lower()}/{platform.machine().lower()}")
+
+
+app.command()(generation)
 
 
 if __name__ == "__main__":
