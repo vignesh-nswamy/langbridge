@@ -32,6 +32,9 @@ Refer to [LangFuse Docs](https://langfuse.com/docs/get-started) for more details
 ### 💻 As a CLI
 ```bash
 export OPENAI_API_KEY=<openai_api_key>
+export LANGFUSE_HOST=<langfuse_host>
+export LANGFUSE_PUBLIC_KEY=<langfuse_public_key>
+export LANGFUSE_SECRET_KEY=<langfuse_secret_key>
 
 langbridge generation --service openai \
   --model gpt-3.5-turbo \
