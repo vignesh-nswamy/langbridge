@@ -58,7 +58,7 @@ from typing import Literal, List
 from pydantic import BaseModel, Field
 
 from langbridge.handlers import OpenAiGenerationHandler
-from langbridge.schema import OpenAiChatGenerationResponse
+from langbridge.schema import GenerationResponse
 from langbridge.callbacks.analytics import LangfuseCallbackHandler
 
 
@@ -89,7 +89,7 @@ handler = OpenAiGenerationHandler(
     ]
 )
 
-responses: List[OpenAiChatGenerationResponse] = asyncio.run(handler.execute())
+responses: List[GenerationResponse] = asyncio.run(handler.execute())
 ```
 ---
 ## 👨‍💻 Contributing
