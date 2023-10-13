@@ -1,13 +1,13 @@
 import typer
 
-from .process import process
+from .generation import generation
 
 
 app = typer.Typer()
 
 
 @app.command()
-def version():
+def __version():
     import platform
     import sys
 
@@ -16,7 +16,7 @@ def version():
     print(f"OS/Arch:\t\t{platform.system().lower()}/{platform.machine().lower()}")
 
 
-app.command()(process)
+app.command()(generation)
 
 
 if __name__ == "__main__":

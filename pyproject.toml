@@ -17,15 +17,21 @@ tiktoken = "0.5.1"
 typer = "0.9.0"
 rich = "^13.5.3"
 pydantic = "1.10.12"
-langchain = "^0.0.295"
-langfuse = "1.0.28"
+langchain = "0.0.309"
+langfuse = "1.0.35"
+anthropic = "0.3.11"
 
 [tool.poetry.scripts]
-openai-processor = "langbridge.cli:app"
+langbridge = "langbridge.cli:app"
 
 
 [tool.poetry.group.dev.dependencies]
 jupyter = "^1.0.0"
+
+
+[tool.poetry.group.test.dependencies]
+pytest = "7.4.2"
+pytest-asyncio = "0.21.1"
 
 
 [build-system]

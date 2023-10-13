@@ -1,1 +1,1 @@
-from .handler import ChatRequestHandler
+from .generation import OpenAiGenerationHandler

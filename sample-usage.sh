@@ -8,13 +8,13 @@ else
   exit 1
 fi
 
-openai-processor process --model gpt-4 \
+langbridge generation --service openai \
+  --model gpt-3.5-turbo \
   --infile ./examples/input.jsonl \
   --outfile ./examples/output.jsonl \
   --prompt-file ./examples/prompt.txt \
   --response-format-file ./examples/response-format.json \
-  --max-response-tokens 75 \
+  --model-parameters '{"max_tokens": 75, "temperature": 0}' \
   --max-requests-per-minute 100 \
   --max-tokens-per-minute 39500 \
-  --max-attempts-per-request 3 \
-  --trace-name openai-processor-test
+  --max-attempts-per-request 3

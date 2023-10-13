@@ -1,11 +1,9 @@
-import uuid
-from hashlib import sha1
-
 import json
 import asyncio
-import logging
+from enum import Enum
 from pathlib import Path
 from typing import *
+from ast import literal_eval
 
 import rich.progress
 import typer
@@ -13,36 +11,24 @@ from pydantic import Field, create_model
 from rich import box
 from rich.console import Console
 from rich.panel import Panel
-from rich.logging import RichHandler
 
-from langfuse import Langfuse
-from langfuse.model import CreateTrace
-
-from langbridge.generations import ChatGeneration
-from langbridge.handlers import ChatRequestHandler
-from langbridge.model_params import ChatModelParams
-from langbridge.settings import get_langfuse_settings
+from langbridge.handlers import OpenAiGenerationHandler
+from langbridge.settings import get_openai_settings
 from langbridge.utils import get_logger
+
 
 console = Console(width=100)
 
-logging.basicConfig(
-    level="NOTSET",
-    handlers=[
-        RichHandler(level="INFO", console=console, rich_tracebacks=True)
-    ]
-)
 _logger = get_logger()
-
-_langfuse_settings = get_langfuse_settings()
-_langfuse = Langfuse(
-    host=_langfuse_settings.host,
-    secret_key=_langfuse_settings.secret_key,
-    public_key=_langfuse_settings.public_key
-)
+_openai_settings = get_openai_settings()
 
 
-def process(
+class ApiService(str, Enum):
+    openai = "openai"
+
+
+def generation(
+    service: ApiService = typer.Option(default=ApiService.openai),
     model: str = typer.Option(help="Name of model to use for API calls"),
     infile: Path = typer.Option(help="Path to a `jsonl` file containing the input texts and optional metadata",
                                 exists=True),
@@ -50,38 +36,34 @@ def process(
     prompt_file: Path = typer.Option(default=None, help="Path to file containing the prompt", exists=True),
     response_format_file: Path = typer.Option(default=None, help="Path to file containing the response format json",
                                               exists=True),
-    max_response_tokens: int = typer.Option(help="Maximum response context length"),
+    model_parameters: str = typer.Option(callback=literal_eval),
     max_requests_per_minute: int = typer.Option(default=100, help="Maximum number of requests per minute"),
     max_tokens_per_minute: int = typer.Option(default=39500, help="Maximum number of tokens per minute"),
     max_attempts_per_request: int = typer.Option(default=5, help="Maximum number of attempts per request"),
-    trace_name: Optional[str] = typer.Option(default=None, help="Langfuse trace name. If not provided, trace will not be used to track generations")
 ):
     """
-    This method is responsible for processing requests using the specified model via API calls. It reads input texts and 
+    This method is responsible for processing requests using the specified model via API calls. It reads input texts and
     optional metadata from a provided .jsonl file and builds a list of generations using the provided prompt and response format files.
 
     Args:
+        service: The name of the LLM Service to be used for generations. Currently only `openai` is supported.
         model: Name of the model to use for API calls (default is None).
         infile: Path to a .jsonl file containing the input texts and optional metadata. The file must exist.
         outfile: Path to a .jsonl file where the outputs will be written.
         prompt_file: Path to a file containing the prompt, if exists.
         response_format_file: Path to a .jsonl file containing the response format json, if exists.
-        max_response_tokens: Maximum response context length.
+        model_parameters: Model parameters to be included in the API call.
         max_requests_per_minute: Maximum number of requests per minute (default is 100).
         max_tokens_per_minute: Maximum number of tokens per minute (default is 39500).
         max_attempts_per_request: Maximum number of attempts per request (default is 5).
-        trace_name: Langfuse trace name. If not provided, trace will not be used to track generations.
     """
+    if not isinstance(model_parameters, dict):
+        raise ValueError("The parameter `model_parameters` must be passed as a JSON String")
+
     console.print(
         Panel(
             "[bold]Welcome to the OpenAI Processor CLI![/bold]", box=box.DOUBLE,
         )
-    )
-
-    model_params = ChatModelParams(
-        model=model,
-        temperature=0,
-        max_tokens=max_response_tokens
     )
 
     with rich.progress.open(infile, "r", description="Reading input file...", console=console) as f:
@@ -115,44 +97,21 @@ def process(
             **fields
         )
 
-    trace = _langfuse.trace(
-        CreateTrace(
-            id=str(
-                uuid.UUID(
-                    bytes=sha1(
-                        str.encode(trace_name)
-                    ).digest()[:16],
-                    version=4
-                )
-            ),
-            name=trace_name
-        )
-    ) if trace_name else None
-
-    generations = [
-        ChatGeneration(
-            input=line.pop("text"),
-            metadata={"index": i, **line},
-            base_prompt=prompt,
-            response_model=response_model,
-            model_parameters=model_params,
-            max_attempts=max_attempts_per_request,
-            trace=trace
-        )
-        for i, line in enumerate(lines)
-    ]
-
-    handler = ChatRequestHandler(
-        generations=generations,
+    handler = OpenAiGenerationHandler(
+        model=model,
+        model_parameters=model_parameters,
+        inputs=lines,
+        base_prompt=prompt,
+        response_model=response_model,
         max_requests_per_minute=max_requests_per_minute,
         max_tokens_per_minute=max_tokens_per_minute,
-        outfile=outfile
+        max_attempts_per_request=max_attempts_per_request
     )
 
     _ = typer.confirm(
-        f"{handler.total_requests} requests are scheduled, "
-        f"collectively containing {handler.total_tokens} tokens."
-        f"Total approximate cost is ${round(handler.total_cost, 2)}."
+        f"{len(lines)} requests are scheduled, "
+        f"collectively containing {handler.approximate_tokens} tokens."
+        f"Total approximate cost is ${round(handler.approximate_cost, 2)}."
         f" Proceed?",
         abort=True
     )
@@ -164,8 +123,7 @@ def process(
     ) as progress:
         progress.add_task(description="Initiating API calls and waiting for responses...")
         asyncio.run(
-            handler.execute()
+            handler.execute(outfile=outfile)
         )
 
-    _logger.info("All responses have been written. Waiting for langfuse to finish logging...")
-    _langfuse.flush()
+    _logger.info("All responses have been written.")
