@@ -66,7 +66,8 @@ class ResponseModel(BaseModel):
     answer: Literal["True", "False"] = Field(description="Whether the statement is True or False")
     reason: str = Field(description="A detailed reason why the statement is True or False")
     
-    
+
+os.environ["OPENAI_API_KEY"] = "<openai_api_key>"    
 os.environ["LANGFUSE_HOST"] = "<langfuse_host>"
 os.environ["LANGFUSE_PUBLIC_KEY"] = "<langfuse_public_key>"
 os.environ["LANGFUSE_SECRET_KEY"] = "<langfuse_secret_key>"
