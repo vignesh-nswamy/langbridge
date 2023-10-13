@@ -42,11 +42,13 @@ langbridge generation --service openai \
   --model-parameters '{"max_tokens": 75, "temperature": 0}' \
   --max-requests-per-minute 100 \
   --max-tokens-per-minute 39500 \
-  --max-attempts-per-request 3
+  --max-attempts-per-request 3 \
+  --analytics-backend langfuse
 ```
 
 ### 📦 As a Python Package
 ```python
+import os
 import asyncio
 from typing import Literal, List
 
@@ -54,11 +56,17 @@ from pydantic import BaseModel, Field
 
 from langbridge.handlers import OpenAiGenerationHandler
 from langbridge.schema import OpenAiChatGenerationResponse
+from langbridge.callbacks.analytics import LangfuseCallbackHandler
 
 
 class ResponseModel(BaseModel):
     answer: Literal["True", "False"] = Field(description="Whether the statement is True or False")
     reason: str = Field(description="A detailed reason why the statement is True or False")
+    
+    
+os.environ["LANGFUSE_HOST"] = "<langfuse_host>"
+os.environ["LANGFUSE_PUBLIC_KEY"] = "<langfuse_public_key>"
+os.environ["LANGFUSE_SECRET_KEY"] = "<langfuse_secret_key>"
 
     
 handler = OpenAiGenerationHandler(
@@ -71,7 +79,10 @@ handler = OpenAiGenerationHandler(
     base_prompt="Answer if the statement below is True or False",
     response_model=ResponseModel,
     max_requests_per_minute=100,
-    max_tokens_per_minute=20000
+    max_tokens_per_minute=20000,
+    callbacks=[
+        LangfuseCallbackHandler()
+    ]
 )
 
 responses: List[OpenAiChatGenerationResponse] = asyncio.run(handler.execute())
