@@ -1,4 +1,4 @@
-# 🤖LangBridge
+# ➿ LangBridge
 A package to call LLM Services / APIs without having to worry about rate limits. It also seamlessly integrates with Langfuse, 
 providing an interface for analytics and to track / log API calls and their costs.</br>
 </br>
@@ -6,13 +6,13 @@ providing an interface for analytics and to track / log API calls and their cost
 
 ---
 
-## 🚀Getting Started
-### 📋Prerequisites
+## 🚀 Getting Started
+### 📋 Prerequisites
 * Python 3.9+ 🐍
 * [Poetry](https://python-poetry.org/) <img src="https://python-poetry.org/images/logo-origami.svg" width="10" height="10">
 * [Langfuse Server](https://langfuse.com/) [Optional] 🪢
 
-### 💾Installation
+### 💾 Installation
 Clone the repository
 ```bash
 git clone https://github.com/vignesh-nswamy/langbridge.git
@@ -77,7 +77,7 @@ handler = OpenAiGenerationHandler(
 responses: List[OpenAiChatGenerationResponse] = asyncio.run(handler.execute())
 ```
 ---
-## 👨‍💻Contributing
+## 👨‍💻 Contributing
 Wanna pitch in? Awesome! Here's how:
 1. Clone the repo 👾
 2. Create a feature branch (`git checkout -b feature/cool-stuff`) 🌿
@@ -85,9 +85,15 @@ Wanna pitch in? Awesome! Here's how:
 4. Push (`git push origin feature/cool-stuff`)
 5. Open a PR ✅
 ---
-## 📜License
+## 📜 License
 Distributed under the MIT License. Check out `LICENSE` for more information.
 
 ---
-## 🐛Reporting Problems
-Got issues or feature requests?, [open an issue](https://github.com/vignesh-nswamy/langbridge/issues) right away!
+## 🐛 Reporting Problems
+Got issues or feature requests? [Open an issue](https://github.com/vignesh-nswamy/langbridge/issues) right away!
+
+---
+## ⚠️ Disclaimer
+This project is a labor of ❤️ and works well in its current state. 
+However, it is intended for experimental or educational use and may not provide long-term stability.
+If it aligns with your needs or your organization's, you're welcome to fork and adapt it to your liking.

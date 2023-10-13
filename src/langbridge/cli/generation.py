@@ -15,6 +15,8 @@ from rich.panel import Panel
 from langbridge.handlers import OpenAiGenerationHandler
 from langbridge.settings import get_openai_settings
 from langbridge.utils import get_logger
+from langbridge.callbacks import FileCallbackHandler
+from langbridge.callbacks.analytics import LangfuseCallbackHandler
 
 
 console = Console(width=100)
@@ -25,6 +27,10 @@ _openai_settings = get_openai_settings()
 
 class ApiService(str, Enum):
     openai = "openai"
+
+
+class AnalyticsBackend(str, Enum):
+    langfuse = "langfuse"
 
 
 def generation(
@@ -40,6 +46,7 @@ def generation(
     max_requests_per_minute: int = typer.Option(default=100, help="Maximum number of requests per minute"),
     max_tokens_per_minute: int = typer.Option(default=39500, help="Maximum number of tokens per minute"),
     max_attempts_per_request: int = typer.Option(default=5, help="Maximum number of attempts per request"),
+    analytics_backend: AnalyticsBackend = typer.Option(default=None)
 ):
     """
     This method is responsible for processing requests using the specified model via API calls. It reads input texts and
@@ -56,6 +63,7 @@ def generation(
         max_requests_per_minute: Maximum number of requests per minute (default is 100).
         max_tokens_per_minute: Maximum number of tokens per minute (default is 39500).
         max_attempts_per_request: Maximum number of attempts per request (default is 5).
+        analytics_backend: Backend to use for logging requests and analytics
     """
     if not isinstance(model_parameters, dict):
         raise ValueError("The parameter `model_parameters` must be passed as a JSON String")
@@ -97,6 +105,15 @@ def generation(
             **fields
         )
 
+    callbacks = [
+        FileCallbackHandler(outfile=outfile)
+    ]
+
+    if analytics_backend and analytics_backend.value == "langfuse":
+        callbacks.append(
+            LangfuseCallbackHandler()
+        )
+
     handler = OpenAiGenerationHandler(
         model=model,
         model_parameters=model_parameters,
@@ -105,13 +122,14 @@ def generation(
         response_model=response_model,
         max_requests_per_minute=max_requests_per_minute,
         max_tokens_per_minute=max_tokens_per_minute,
-        max_attempts_per_request=max_attempts_per_request
+        max_attempts_per_request=max_attempts_per_request,
+        callbacks=callbacks
     )
 
     _ = typer.confirm(
         f"{len(lines)} requests are scheduled, "
         f"collectively containing {handler.approximate_tokens} tokens."
-        f"Total approximate cost is ${round(handler.approximate_cost, 2)}."
+        f"Total approximate cost is ${round(handler.approximate_cost, 3)}."
         f" Proceed?",
         abort=True
     )
@@ -123,7 +141,7 @@ def generation(
     ) as progress:
         progress.add_task(description="Initiating API calls and waiting for responses...")
         asyncio.run(
-            handler.execute(outfile=outfile)
+            handler.execute()
         )
 
     _logger.info("All responses have been written.")

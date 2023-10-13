@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field, validator
 
 from langbridge.schema import OpenAiGenerationPrompt
+from langbridge.callbacks import BaseCallbackManager
 from langbridge.trackers import Usage, ProgressTracker
 from langbridge.parameters import OpenAiChatCompletionParameters
 
@@ -18,6 +19,10 @@ class BaseGeneration(BaseModel):
     metadata: Optional[Dict[str, Any]]
     max_attempts: Optional[int] = Field(default=3)
     usage: Optional[Usage]
+    callback_manager: Optional[BaseCallbackManager]
+
+    class Config:
+        arbitrary_types_allowed = True
 
     @validator("usage", pre=True, always=True)
     def resolve_usage(cls, v: Usage, values: Dict[str, Any]) -> Usage:
@@ -33,7 +38,6 @@ class BaseGeneration(BaseModel):
         self,
         retry_queue: asyncio.Queue,
         progress_tracker: ProgressTracker,
-        outfile: Optional[Path] = None
     ) -> Dict[str, Any]:
         raise NotImplemented
 

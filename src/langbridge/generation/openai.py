@@ -9,11 +9,13 @@ from openai.openai_object import OpenAIObject
 
 import tiktoken
 from pydantic import Field, validator
+
+from langchain.load.dump import dumpd
 from langchain.callbacks.openai_info import get_openai_token_cost_for_model
 
 from .base import BaseGeneration
 from langbridge.trackers import Usage, ProgressTracker
-from langbridge.schema import OpenAiChatGenerationResponse, OpenAiGenerationPrompt
+from langbridge.schema import OpenAiChatGenerationResponse, OpenAiGenerationPrompt, GenerationResponse
 
 
 class OpenAiGeneration(BaseGeneration):
@@ -79,8 +81,11 @@ class OpenAiGeneration(BaseGeneration):
         self,
         retry_queue: asyncio.Queue,
         progress_tracker: ProgressTracker,
-        outfile: Optional[Path] = None
-    ) -> OpenAiChatGenerationResponse:
+    ) -> GenerationResponse:
+        self.callback_manager.on_llm_start(
+            self.dict()
+        )
+
         error = False
         try:
             response: OpenAIObject = await self._call_api()
@@ -104,9 +109,23 @@ class OpenAiGeneration(BaseGeneration):
             openai.error.PermissionError
         ) as e:
             error = True
+
+            if self.callback_manager:
+                self.callback_manager.on_llm_error(
+                    error=e,
+                    run_id=self.id
+                )
+
             raise e
         except Exception as e:
             error = True
+
+            if self.callback_manager:
+                self.callback_manager.on_llm_error(
+                    error=e,
+                    run_id=self.id
+                )
+
             raise e
 
         if error:
@@ -118,16 +137,21 @@ class OpenAiGeneration(BaseGeneration):
                 progress_tracker.num_tasks_in_progress -= 1
                 progress_tracker.num_tasks_failed += 1
         else:
-            response: OpenAiChatGenerationResponse = OpenAiChatGenerationResponse(
-                **response.to_dict_recursive()
+            response: GenerationResponse = GenerationResponse(
+                id=str(self.id),
+                completion=response.choices[0].message.content,
+                usage=response.usage.to_dict(),
+                metadata=self.metadata
             )
             self._update_usage(response)
 
             progress_tracker.num_tasks_in_progress -= 1
             progress_tracker.num_tasks_succeeded += 1
 
-            if outfile:
-                with open(outfile, "a") as out_f:
-                    out_f.write(json.dumps(response.dict()) + "\n")
+            if self.callback_manager:
+                self.callback_manager.on_llm_end(
+                    response=response.dict(),
+                    run_id=self.id
+                )
 
             return response

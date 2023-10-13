@@ -17,4 +17,5 @@ langbridge generation --service openai \
   --model-parameters '{"max_tokens": 75, "temperature": 0}' \
   --max-requests-per-minute 100 \
   --max-tokens-per-minute 39500 \
-  --max-attempts-per-request 3
+  --max-attempts-per-request 3 \
+  --analytics-backend langfuse

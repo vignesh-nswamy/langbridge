@@ -1,4 +1,5 @@
 import time
+import uuid
 import asyncio
 from pathlib import Path
 from asyncio import Queue
@@ -9,17 +10,20 @@ from pydantic import BaseModel, Field, validator
 
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import PromptTemplate
+from langchain.load.dump import dumpd
 
 from langbridge.generation import BaseGeneration, OpenAiGeneration
 from langbridge.trackers import ProgressTracker
 from langbridge.utils import get_logger
 from langbridge.schema import GenerationHandlerInput, OpenAiGenerationPrompt
+from langbridge.callbacks import BaseCallbackManager, BaseCallbackHandler
 
 
 _logger = get_logger()
 
 
 class BaseGenerationHandler(BaseModel):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4)
     model: str
     model_parameters: Dict[str, Any]
     inputs: List[GenerationHandlerInput]
@@ -28,15 +32,26 @@ class BaseGenerationHandler(BaseModel):
     max_requests_per_minute: int
     max_tokens_per_minute: int
     max_attempts_per_request: int = Field(default=3)
-    generations: Optional[List[BaseGeneration]]
     retry_queue: Optional[Queue] = Field(default=Queue())
     progress_tracker: Optional[ProgressTracker] = Field(default=ProgressTracker())
+    callbacks: Optional[List[BaseCallbackHandler]]
     # Read-only Fields
+    callback_manager: Optional[BaseCallbackManager]
+    generations: Optional[List[BaseGeneration]]
     approximate_tokens: Optional[int] = Field(description="Approximate number of prompt tokens in all the requests to be made")
     approximate_cost: Optional[float] = Field(description="Approximate cost for all the requests to be made")
 
     class Config:
         arbitrary_types_allowed = True
+
+    @validator("callback_manager", always=True)
+    def resolve_callback_manager(cls, _, values: Dict[str, Any]) -> BaseCallbackManager:
+        callbacks = values.get("callbacks", [])
+
+        return BaseCallbackManager(
+            handlers=callbacks,
+            run_id=values["id"]
+        )
 
     @validator("generations", always=True)
     def resolve_generations(cls, v: List[BaseGeneration], values: Dict[str, Any]) -> List[BaseGeneration]:
@@ -62,8 +77,11 @@ class BaseGenerationHandler(BaseModel):
 
     async def execute(
         self,
-        outfile: Optional[Path] = None
     ):
+        self.callback_manager.on_run_start(
+            serialized=self.dict()
+        )
+
         generations = iter(self.generations)
 
         rate_limit_pause = 15
@@ -118,7 +136,6 @@ class BaseGenerationHandler(BaseModel):
                             next_request.invoke(
                                 retry_queue=self.retry_queue,
                                 progress_tracker=self.progress_tracker,
-                                outfile=outfile
                             )
                         )
                     )
@@ -138,9 +155,14 @@ class BaseGenerationHandler(BaseModel):
                     rate_limit_pause - seconds_since_rate_limit_error
                 )
 
-        if not outfile:
-            results = await asyncio.gather(*tasks)
-            return results
+        results = await asyncio.gather(*tasks)
+
+        self.callback_manager.on_run_end(
+            response={},
+            run_id=self.id
+        )
+
+        return results
 
 
 class OpenAiGenerationHandler(BaseGenerationHandler):
@@ -185,7 +207,8 @@ class OpenAiGenerationHandler(BaseGenerationHandler):
                     ]
                 ),
                 metadata=inp.metadata,
-                max_attempts=values.get("max_attempts_per_request")
+                max_attempts=values.get("max_attempts_per_request"),
+                callback_manager=values.get("callback_manager")
             )
             for inp in inputs
         ]
