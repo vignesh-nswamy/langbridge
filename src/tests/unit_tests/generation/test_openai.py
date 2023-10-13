@@ -1,7 +1,10 @@
+import asyncio
+
 import pytest
 
 from langbridge.generation import OpenAiGeneration
-from langbridge.schema import LlmGenerationPrompt
+from langbridge.schema import OpenAiGenerationPrompt, OpenAiChatGenerationResponse
+from langbridge.trackers import ProgressTracker
 
 
 @pytest.fixture
@@ -9,7 +12,7 @@ def fake_generation() -> OpenAiGeneration:
     generation = OpenAiGeneration(
         model="gpt-3.5-turbo",
         model_parameters={"temperature": 0, "max_tokens": 50},
-        prompt=LlmGenerationPrompt(
+        prompt=OpenAiGenerationPrompt(
             messages=[
                 {"role": "user", "content": "tell me a joke"}
             ]
@@ -33,4 +36,13 @@ def test_cost_computations(fake_generation: OpenAiGeneration) -> None:
     assert fake_generation.usage.completion_cost > 0
 
 
-def test_invocation(fake_generation: OpenAiGeneration):
+@pytest.mark.asyncio
+async def test_invocation(fake_generation: OpenAiGeneration):
+    from langbridge.settings import get_openai_settings
+
+    response: OpenAiChatGenerationResponse = await fake_generation.invoke(
+        retry_queue=asyncio.Queue(),
+        progress_tracker=ProgressTracker()
+    )
+
+    assert response.choices[0].message.content is not None
