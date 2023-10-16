@@ -109,8 +109,6 @@ class AnthropicGeneration(BaseGeneration):
             if self.max_attempts:
                 retry_queue.put_nowait(self)
             else:
-                self.status_message = "Error"
-
                 progress_tracker.num_tasks_in_progress -= 1
                 progress_tracker.num_tasks_failed += 1
         else:
