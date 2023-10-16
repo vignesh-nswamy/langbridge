@@ -1,10 +1,15 @@
 import asyncio
+from uuid import uuid4
 
 import pytest
+from unittest.mock import AsyncMock
+
+from openai.openai_object import OpenAIObject
 
 from langbridge.generation import OpenAiGeneration
-from langbridge.schema import OpenAiGenerationPrompt, OpenAiChatGenerationResponse
+from langbridge.schema import GenerationResponse, OpenAiGenerationPrompt
 from langbridge.trackers import ProgressTracker
+from langbridge.callbacks import BaseCallbackManager
 
 
 @pytest.fixture
@@ -17,7 +22,8 @@ def fake_generation() -> OpenAiGeneration:
                 {"role": "user", "content": "tell me a joke"}
             ]
         ),
-        metadata={"index": 0}
+        metadata={"index": 0},
+        callback_manager=BaseCallbackManager(handlers=[], run_id=uuid4())
     )
 
     return generation
@@ -37,12 +43,42 @@ def test_cost_computations(fake_generation: OpenAiGeneration) -> None:
 
 
 @pytest.mark.asyncio
-async def test_invocation(fake_generation: OpenAiGeneration):
-    from langbridge.settings import get_openai_settings
+async def test_execution(
+    fake_generation: OpenAiGeneration,
+    monkeypatch
+) -> None:
+    async def mock_call_api() -> OpenAIObject:
+        response = OpenAIObject()
+        response.id = "cmpl-uqkvlQyYK7bGYrRHQ0eXlWi7"
+        response.object = "text_completion"
+        response.created = 1589478378
+        response.model = "gpt-3.5-turbo"
 
-    response: OpenAiChatGenerationResponse = await fake_generation.invoke(
+        choice = OpenAIObject()
+        message = OpenAIObject()
+        message.role = "assistant"
+        message.content = "\n\nThis is indeed a test"
+        choice.message = message
+        choice.index = 0
+        choice.logprobs = None
+        choice.finish_reason = "length"
+        response.choices = [choice]
+
+        usage = OpenAIObject()
+        usage.prompt_tokens = 5
+        usage.completion_tokens = 17
+        usage.total_tokens = 12
+        response.usage = usage
+
+        return response
+
+    # Patch the execute method of the specific instance
+    monkeypatch.setattr("langbridge.generation.OpenAiGeneration._call_api", AsyncMock(side_effect=mock_call_api))
+
+    response: GenerationResponse = await fake_generation.invoke(
         retry_queue=asyncio.Queue(),
         progress_tracker=ProgressTracker()
     )
 
-    assert response.choices[0].message.content is not None
+    assert response.completion is not None
+    assert fake_generation.usage.completion_tokens == 17

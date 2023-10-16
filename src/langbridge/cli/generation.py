@@ -12,7 +12,7 @@ from rich import box
 from rich.console import Console
 from rich.panel import Panel
 
-from langbridge.handlers import OpenAiGenerationHandler
+from langbridge.handlers.generation import OpenAiGenerationHandler, AnthropicGenerationHandler
 from langbridge.settings import get_openai_settings
 from langbridge.utils import get_logger
 from langbridge.callbacks import FileCallbackHandler
@@ -27,6 +27,7 @@ _openai_settings = get_openai_settings()
 
 class ApiService(str, Enum):
     openai = "openai"
+    anthropic = "anthropic"
 
 
 class AnalyticsBackend(str, Enum):
@@ -114,7 +115,10 @@ def generation(
             LangfuseCallbackHandler()
         )
 
-    handler = OpenAiGenerationHandler(
+    RunHandler = OpenAiGenerationHandler if service.value == "openai" \
+        else AnthropicGenerationHandler
+
+    handler = RunHandler(
         model=model,
         model_parameters=model_parameters,
         inputs=lines,
