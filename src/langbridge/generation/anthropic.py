@@ -4,60 +4,40 @@ import asyncio
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-import openai
-from openai.openai_object import OpenAIObject
+import anthropic
+from anthropic import AsyncAnthropic, Anthropic
+from anthropic.types import Completion
 
 import tiktoken
 from pydantic import Field, validator
 
-from langchain.callbacks.openai_info import get_openai_token_cost_for_model
-
 from .base import BaseGeneration
 from langbridge.trackers import Usage, ProgressTracker
-from langbridge.schema import OpenAiChatGenerationResponse, OpenAiGenerationPrompt, GenerationResponse
+from langbridge.schema import GenerationResponse
+from langbridge.parameters import AnthropicCompletion
 
 
-class OpenAiGeneration(BaseGeneration):
-    prompt: OpenAiGenerationPrompt
+_anthropic = Anthropic()
+_async_anthropic = AsyncAnthropic()
 
-    async def _call_api(self) -> OpenAIObject:
-        return await openai.ChatCompletion.acreate(
-            messages=[
-                message.dict()
-                for message in self.prompt.messages
-            ],
-            model=self.model,
-            **self.model_parameters.dict()
-        )
+
+class AnthropicGeneration(BaseGeneration):
+    model_parameters: AnthropicCompletion
+    prompt: str
 
     @validator("usage", pre=True, always=True)
     def resolve_usage(cls, v: Usage, values: Dict[str, Any]) -> Usage:
         if v: return v
 
-        encoder = tiktoken.encoding_for_model(values["model"])
+        prompt_tokens = _anthropic.count_tokens(values["prompt"])
 
-        prompt_tokens = 0
-        prompt: OpenAiGenerationPrompt = values["prompt"]
-        for message in prompt.messages:
-            prompt_tokens += 4  # every message follows <im_start>{role/name}\n{content}<im_end>\n
-            prompt_tokens += len(encoder.encode(message.role)) + len(encoder.encode(message.content))
-        prompt_tokens += 2  # every reply is primed with <im_start>assistant
-
-        completion_tokens = values["model_parameters"].max_tokens
+        completion_tokens = values["model_parameters"].max_tokens_to_sample
 
         return Usage(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
-            prompt_cost=get_openai_token_cost_for_model(
-                model_name=values["model"],
-                num_tokens=prompt_tokens,
-                is_completion=False
-            ),
-            completion_cost=get_openai_token_cost_for_model(
-                model_name=values["model"],
-                num_tokens=completion_tokens,
-                is_completion=True
-            )
+            prompt_cost=0,
+            completion_cost=0
         )
 
     def _update_usage(self, response: GenerationResponse) -> None:
@@ -66,16 +46,15 @@ class OpenAiGeneration(BaseGeneration):
         self.usage = Usage(
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
-            prompt_cost=get_openai_token_cost_for_model(
-                model_name=self.model,
-                num_tokens=prompt_tokens,
-                is_completion=False
-            ),
-            completion_cost=get_openai_token_cost_for_model(
-                model_name=self.model,
-                num_tokens=completion_tokens,
-                is_completion=True
-            )
+            prompt_cost=0,
+            completion_cost=0
+        )
+
+    async def _call_api(self) -> Completion:
+        return await _async_anthropic.completions.create(
+            prompt=self.prompt,
+            model=self.model,
+            **self.model_parameters.dict()
         )
 
     async def invoke(
@@ -89,25 +68,22 @@ class OpenAiGeneration(BaseGeneration):
 
         error = False
         try:
-            response: OpenAIObject = await self._call_api()
-        except openai.error.APIError as ae:
-            error = True
-            progress_tracker.num_api_errors += 1
-        except openai.error.RateLimitError as re:
+            response: Completion = await self._call_api()
+        except anthropic.RateLimitError as re:
             error = True
             progress_tracker.time_last_rate_limit_error = time.time()
             progress_tracker.num_rate_limit_errors += 1
-        except openai.error.Timeout as te:
+        except anthropic.APITimeoutError as te:
             error = True
             progress_tracker.num_other_errors += 1
-        except openai.error.ServiceUnavailableError as se:
+        except anthropic.InternalServerError as se:
             error = True
             progress_tracker.num_api_errors += 1
         except (
-            openai.error.APIConnectionError,
-            openai.error.InvalidRequestError,
-            openai.error.AuthenticationError,
-            openai.error.PermissionError
+            anthropic.BadRequestError,
+            anthropic.NotFoundError,
+            anthropic.AuthenticationError,
+            anthropic.PermissionDeniedError
         ) as e:
             error = True
 
@@ -133,14 +109,21 @@ class OpenAiGeneration(BaseGeneration):
             if self.max_attempts:
                 retry_queue.put_nowait(self)
             else:
+                self.status_message = "Error"
+
                 progress_tracker.num_tasks_in_progress -= 1
                 progress_tracker.num_tasks_failed += 1
         else:
+            completion_tokens = _anthropic.count_tokens(response.completion)
             response: GenerationResponse = GenerationResponse(
                 id=str(self.id),
-                completion=response.choices[0].message.content,
-                usage=response.usage.to_dict(),
-                metadata=self.metadata
+                completion=response.completion,
+                metadata=self.metadata,
+                usage={
+                    "prompt_tokens": self.usage.prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": self.usage.prompt_tokens + completion_tokens
+                }
             )
             self._update_usage(response)
 

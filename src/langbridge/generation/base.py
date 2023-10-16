@@ -1,7 +1,7 @@
 import asyncio
 from pathlib import Path
 from uuid import uuid4, UUID
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, Union
 
 from pydantic import BaseModel, Field, validator
 
@@ -14,8 +14,8 @@ from langbridge.parameters import OpenAiChatCompletionParameters
 class BaseGeneration(BaseModel):
     id: UUID = Field(default_factory=uuid4)
     model: str
-    model_parameters: OpenAiChatCompletionParameters
-    prompt: OpenAiGenerationPrompt
+    model_parameters: Union[OpenAiChatCompletionParameters]
+    prompt: Any
     metadata: Optional[Dict[str, Any]]
     max_attempts: Optional[int] = Field(default=3)
     usage: Optional[Usage]
@@ -28,7 +28,7 @@ class BaseGeneration(BaseModel):
     def resolve_usage(cls, v: Usage, values: Dict[str, Any]) -> Usage:
         raise NotImplemented
 
-    async def _call_api(self) -> Dict[str, Any]:
+    async def _call_api(self) -> Any:
         raise NotImplemented
 
     def _process_response(self, response: Dict[str, Any]) -> Dict[str, Any]:
@@ -41,5 +41,3 @@ class BaseGeneration(BaseModel):
     ) -> Dict[str, Any]:
         raise NotImplemented
 
-    # class Config:
-    #     arbitrary_types_allowed = True

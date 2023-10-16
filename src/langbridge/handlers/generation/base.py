@@ -10,9 +10,8 @@ from pydantic import BaseModel, Field, validator
 
 from langchain.output_parsers import PydanticOutputParser
 from langchain.prompts import PromptTemplate
-from langchain.load.dump import dumpd
 
-from langbridge.generation import BaseGeneration, OpenAiGeneration
+from langbridge.generation import BaseGeneration, OpenAiGeneration, AnthropicGeneration
 from langbridge.trackers import ProgressTracker
 from langbridge.utils import get_logger
 from langbridge.schema import GenerationHandlerInput, OpenAiGenerationPrompt
@@ -46,7 +45,7 @@ class BaseGenerationHandler(BaseModel):
 
     @validator("callback_manager", always=True)
     def resolve_callback_manager(cls, _, values: Dict[str, Any]) -> BaseCallbackManager:
-        callbacks = values.get("callbacks", [])
+        callbacks = values.get("callbacks") if values.get("callbacks") else []
 
         return BaseCallbackManager(
             handlers=callbacks,
@@ -61,7 +60,7 @@ class BaseGenerationHandler(BaseModel):
     def compute_approximate_tokens(cls, _, values: Dict[str, Any]) -> int:
         return sum(
             [
-                generation.usage.prompt_tokens
+                generation.usage.prompt_tokens if generation.usage else 0
                 for generation in values["generations"]
             ]
         )
@@ -70,7 +69,7 @@ class BaseGenerationHandler(BaseModel):
     def compute_approximate_cost(cls, _, values: Dict[str, Any]) -> int:
         return sum(
             [
-                generation.usage.total_cost
+                generation.usage.total_cost if generation.usage else 0
                 for generation in values["generations"]
             ]
         )
@@ -163,52 +162,3 @@ class BaseGenerationHandler(BaseModel):
         )
 
         return results
-
-
-class OpenAiGenerationHandler(BaseGenerationHandler):
-    @validator("generations", always=True)
-    def resolve_generations(cls, v: List[OpenAiGeneration], values: Dict[str, Any]) -> List[OpenAiGeneration]:
-        if v: return v
-
-        inputs: List[GenerationHandlerInput] = values["inputs"]
-        base_prompt = values.get("base_prompt")
-        response_model = values.get("response_model")
-
-        if base_prompt and response_model:
-            parser = PydanticOutputParser(pydantic_object=response_model)
-            prompt_template = PromptTemplate(
-                template=base_prompt + "\n{format_instructions}" + "\n{text}",
-                input_variables=["text"],
-                partial_variables={"format_instructions": parser.get_format_instructions()}
-            )
-        elif base_prompt:
-            prompt_template = PromptTemplate(
-                template=base_prompt + "\n{text}",
-                input_variables=["text"]
-            )
-        else:
-            prompt_template = PromptTemplate(
-                template="{text}",
-                input_variables=["text"]
-            )
-
-        return [
-            OpenAiGeneration(
-                model=values["model"],
-                model_parameters=values["model_parameters"],
-                prompt=OpenAiGenerationPrompt(
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": prompt_template.format_prompt(
-                                text=inp.text
-                            ).to_string()
-                        }
-                    ]
-                ),
-                metadata=inp.metadata,
-                max_attempts=values.get("max_attempts_per_request"),
-                callback_manager=values.get("callback_manager")
-            )
-            for inp in inputs
-        ]
