@@ -1,7 +1,7 @@
 import asyncio
 from pathlib import Path
 from uuid import uuid4, UUID
-from typing import Dict, Any, Optional, Union
+from typing import Dict, Any, Optional, Union, List
 
 from pydantic import BaseModel, Field, validator
 
@@ -16,6 +16,7 @@ class BaseGeneration(BaseModel):
     model: str
     model_parameters: Union[OpenAiChatCompletionParameters]
     prompt: Any
+    functions: Optional[List[Dict[str, Any]]] = Field(default=[])
     metadata: Optional[Dict[str, Any]]
     max_attempts: Optional[int] = Field(default=3)
     usage: Optional[Usage]

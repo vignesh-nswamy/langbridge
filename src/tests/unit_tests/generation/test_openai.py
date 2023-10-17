@@ -1,11 +1,8 @@
 import asyncio
 from uuid import uuid4
-
 import pytest
 from unittest.mock import AsyncMock
-
 from openai.openai_object import OpenAIObject
-
 from langbridge.generation import OpenAiGeneration
 from langbridge.schema import GenerationResponse, OpenAiGenerationPrompt
 from langbridge.trackers import ProgressTracker
@@ -19,18 +16,64 @@ def fake_generation() -> OpenAiGeneration:
         model_parameters={"temperature": 0, "max_tokens": 50},
         prompt=OpenAiGenerationPrompt(
             messages=[
-                {"role": "user", "content": "tell me a joke"}
+                {
+                    "role": "user",
+                    "content": "Answer if the statement below is True or False\nConduction is the only form of heat transfer."
+                }
             ]
         ),
         metadata={"index": 0},
         callback_manager=BaseCallbackManager(handlers=[], run_id=uuid4())
     )
-
     return generation
 
 
-def test_prompt_tokens_computation(fake_generation: OpenAiGeneration) -> None:
-    assert fake_generation.usage.prompt_tokens == 11
+@pytest.fixture
+def fake_generation_with_function() -> OpenAiGeneration:
+    generation = OpenAiGeneration(
+        model="gpt-3.5-turbo",
+        model_parameters={"temperature": 0, "max_tokens": 50},
+        prompt=OpenAiGenerationPrompt(
+            messages=[
+                {
+                    "role": "user",
+                    "content": "Answer if the statement below is True or False\nConduction is the only form of heat transfer."
+                }
+            ]
+        ),
+        functions=[
+            {
+                "name": "validate",
+                "description": "Validate if a statement is True or False",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "answer": {
+                            "description": "Whether the statement is True or False",
+                            "enum": ["True", "False"],
+                            "type": "string"
+                        },
+                        "reason": {
+                            "description": "A detailed reason why the statement is True or False",
+                            "type": "string"
+                        }
+                    },
+                    "required": ["answer", "reason"]
+                }
+            }
+        ],
+        metadata={"index": 0},
+        callback_manager=BaseCallbackManager(handlers=[], run_id=uuid4())
+    )
+    return generation
+
+
+def test_prompt_tokens_computation(
+    fake_generation: OpenAiGeneration,
+    fake_generation_with_function: OpenAiGeneration
+) -> None:
+    assert fake_generation_with_function.usage == 97
+    assert fake_generation.usage.prompt_tokens == 27
 
 
 def test_completion_tokens(fake_generation: OpenAiGeneration) -> None:
@@ -53,7 +96,6 @@ async def test_execution(
         response.object = "text_completion"
         response.created = 1589478378
         response.model = "gpt-3.5-turbo"
-
         choice = OpenAIObject()
         message = OpenAIObject()
         message.role = "assistant"
@@ -63,22 +105,18 @@ async def test_execution(
         choice.logprobs = None
         choice.finish_reason = "length"
         response.choices = [choice]
-
         usage = OpenAIObject()
         usage.prompt_tokens = 5
         usage.completion_tokens = 17
         usage.total_tokens = 12
         response.usage = usage
-
         return response
-
     # Patch the execute method of the specific instance
     monkeypatch.setattr("langbridge.generation.OpenAiGeneration._call_api", AsyncMock(side_effect=mock_call_api))
-
     response: GenerationResponse = await fake_generation.invoke(
         retry_queue=asyncio.Queue(),
         progress_tracker=ProgressTracker()
     )
-
     assert response.completion is not None
     assert fake_generation.usage.completion_tokens == 17
+

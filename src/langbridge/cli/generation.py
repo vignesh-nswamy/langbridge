@@ -43,6 +43,9 @@ def generation(
     prompt_file: Path = typer.Option(default=None, help="Path to file containing the prompt", exists=True),
     response_format_file: Path = typer.Option(default=None, help="Path to file containing the response format json",
                                               exists=True),
+    functions_file: Path = typer.Option(default=None,
+                                        help="Path to file containing the function calls to be included in the API call",
+                                        exists=True),
     model_parameters: str = typer.Option(callback=literal_eval),
     max_requests_per_minute: int = typer.Option(default=100, help="Maximum number of requests per minute"),
     max_tokens_per_minute: int = typer.Option(default=39500, help="Maximum number of tokens per minute"),
@@ -59,7 +62,8 @@ def generation(
         infile: Path to a .jsonl file containing the input texts and optional metadata. The file must exist.
         outfile: Path to a .jsonl file where the outputs will be written.
         prompt_file: Path to a file containing the prompt, if exists.
-        response_format_file: Path to a .jsonl file containing the response format json, if exists.
+        response_format_file: Path to a .json file containing the response format.
+        functions_file: Path to a .json file containing the function calls.
         model_parameters: Model parameters to be included in the API call.
         max_requests_per_minute: Maximum number of requests per minute (default is 100).
         max_tokens_per_minute: Maximum number of tokens per minute (default is 39500).
@@ -106,6 +110,12 @@ def generation(
             **fields
         )
 
+    functions = []
+    if functions_file:
+        with rich.progress.open(functions_file, "r", description="Reading functions...",
+                                console=console) as schema_file:
+            functions = json.load(schema_file)
+
     callbacks = [
         FileCallbackHandler(outfile=outfile)
     ]
@@ -127,7 +137,8 @@ def generation(
         max_requests_per_minute=max_requests_per_minute,
         max_tokens_per_minute=max_tokens_per_minute,
         max_attempts_per_request=max_attempts_per_request,
-        callbacks=callbacks
+        callbacks=callbacks,
+        functions=functions
     )
 
     _ = typer.confirm(

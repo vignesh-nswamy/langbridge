@@ -23,12 +23,15 @@ _logger = get_logger()
 
 class OpenAiGenerationHandler(BaseGenerationHandler):
     model_parameters: OpenAiChatCompletionParameters
+
     @validator("generations", always=True)
     def resolve_generations(cls, v: List[OpenAiGeneration], values: Dict[str, Any]) -> List[OpenAiGeneration]:
         if v: return v
 
         inputs: List[GenerationHandlerInput] = values["inputs"]
         base_prompt = values.get("base_prompt")
+
+        # TODO: Remove `response_model` support
         response_model = values.get("response_model")
 
         if base_prompt and response_model:
@@ -65,7 +68,8 @@ class OpenAiGenerationHandler(BaseGenerationHandler):
                 ),
                 metadata=inp.metadata,
                 max_attempts=values.get("max_attempts_per_request"),
-                callback_manager=values.get("callback_manager")
+                callback_manager=values.get("callback_manager"),
+                functions=values["functions"]
             )
             for inp in inputs
         ]

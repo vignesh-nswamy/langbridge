@@ -1,4 +1,5 @@
 import os
+import json
 from uuid import UUID
 from datetime import datetime
 from typing import Dict, Any, Optional, Union
@@ -80,6 +81,10 @@ class LangfuseCallbackHandler(BaseCallbackHandler):
         serialized: Dict[str, Any],
         **kwargs: Any
     ):
+        prompt = {
+            "messages": serialized["prompt"],
+            "functions": serialized["functions"]
+        } if len(serialized["functions"]) else serialized["prompt"]
         start_time = datetime.now()
         self.runs[serialized["id"]] = self.trace.generation(
             CreateGeneration(
@@ -88,7 +93,7 @@ class LangfuseCallbackHandler(BaseCallbackHandler):
                 model_parameters=serialized["model_parameters"],
                 start_time=start_time,
                 completion_start_time=start_time,
-                prompt=serialized["prompt"],
+                prompt=prompt,
                 usage=serialized["usage"],
                 level=ObservationLevel.DEFAULT
             )
@@ -98,11 +103,17 @@ class LangfuseCallbackHandler(BaseCallbackHandler):
         self,
         serialized: Dict[str, Any],
     ):
+        response_model = serialized["response_model"].schema() if serialized.get("response_model") else None
         if self.trace is None:
             self.trace = self.langfuse.trace(
                 CreateTrace(
                     id=str(serialized["id"]),
-                    metadata=serialized.get("metadata")
+                    metadata={
+                        "base_prompt": serialized.get("base_prompt", None),
+                        "function_calls": serialized.get("functions", []),
+                        "response_model": response_model,
+                        "num_llm_calls": len(serialized["generations"])
+                    }
                 )
             )
 
@@ -129,6 +140,8 @@ class LangfuseCallbackHandler(BaseCallbackHandler):
         ** kwargs: Any
     ):
         completion = response.get("completion")
+        completion = json.dumps(completion) if isinstance(completion, dict) else completion
+
         self.runs[run_id] = self.runs[run_id].update(
             UpdateGeneration(
                 completion=completion,

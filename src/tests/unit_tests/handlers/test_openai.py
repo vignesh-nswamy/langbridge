@@ -76,10 +76,50 @@ def fake_handler_with_response_model() -> OpenAiGenerationHandler:
     return handler
 
 
+@pytest.fixture
+def fake_handler_with_function() -> OpenAiGenerationHandler:
+    handler = OpenAiGenerationHandler(
+        model="gpt-3.5-turbo",
+        model_parameters={"temperature": 0.8, "max_tokens": 50},
+        inputs=[
+            {"text": "Conduction is the only form of heat transfer.", "metadata": {"index": i}}
+            for i in range(100)
+        ],
+        base_prompt="Answer if the statement below is True or False",
+        functions=[
+            {
+                "name": "validate",
+                "description": "Validate if a statement is True or False",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "answer": {
+                            "description": "Whether the statement is True or False",
+                            "enum": ["True", "False"],
+                            "type": "string"
+                        },
+                        "reason": {
+                            "description": "A detailed reason why the statement is True or False",
+                            "type": "string"
+                        }
+                    },
+                    "required": ["answer", "reason"]
+                }
+            }
+        ],
+        max_requests_per_minute=100,
+        max_tokens_per_minute=20000,
+        max_attempts_per_request=1
+    )
+
+    return handler
+
+
 def test_cost_computations(
     fake_basic_handler: OpenAiGenerationHandler,
     fake_handler_with_prompt: OpenAiGenerationHandler,
-    fake_handler_with_response_model: OpenAiGenerationHandler
+    fake_handler_with_response_model: OpenAiGenerationHandler,
+    fake_handler_with_function: OpenAiGenerationHandler
 ) -> None:
     assert fake_basic_handler.approximate_cost > 0
     assert fake_handler_with_prompt.approximate_cost > 0
@@ -89,11 +129,13 @@ def test_cost_computations(
 def test_prompt_tokens_computation(
     fake_basic_handler: OpenAiGenerationHandler,
     fake_handler_with_prompt: OpenAiGenerationHandler,
-    fake_handler_with_response_model: OpenAiGenerationHandler
+    fake_handler_with_response_model: OpenAiGenerationHandler,
+    fake_handler_with_function: OpenAiGenerationHandler
 ) -> None:
     assert fake_basic_handler.approximate_tokens == 1700
     assert fake_handler_with_prompt.approximate_tokens == 2700
     assert fake_handler_with_response_model.approximate_tokens == 22500
+    assert fake_handler_with_function.approximate_tokens == 9700
 
 
 @pytest.mark.asyncio

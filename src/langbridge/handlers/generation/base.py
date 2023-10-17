@@ -28,6 +28,7 @@ class BaseGenerationHandler(BaseModel):
     inputs: List[GenerationHandlerInput]
     base_prompt: Optional[str]
     response_model: Optional[ModelMetaclass]
+    functions: Optional[List[Dict[str, Any]]] = Field(default=[])
     max_requests_per_minute: int
     max_tokens_per_minute: int
     max_attempts_per_request: int = Field(default=3)
