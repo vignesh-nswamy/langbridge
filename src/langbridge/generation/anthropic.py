@@ -93,7 +93,7 @@ class AnthropicGeneration(BaseGeneration):
                     run_id=self.id
                 )
 
-            raise e
+            self.max_attempts = 0
         except Exception as e:
             error = True
 
@@ -103,7 +103,7 @@ class AnthropicGeneration(BaseGeneration):
                     run_id=self.id
                 )
 
-            raise e
+            self.max_attempts = 0
 
         if error:
             if self.max_attempts:

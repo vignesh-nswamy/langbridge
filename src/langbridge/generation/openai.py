@@ -133,9 +133,6 @@ class OpenAiGeneration(BaseGeneration):
         error = False
         try:
             response: OpenAIObject = await self._call_api()
-        except openai.error.APIError as ae:
-            error = True
-            progress_tracker.num_api_errors += 1
         except openai.error.RateLimitError as re:
             error = True
             progress_tracker.time_last_rate_limit_error = time.time()
@@ -143,7 +140,10 @@ class OpenAiGeneration(BaseGeneration):
         except openai.error.Timeout as te:
             error = True
             progress_tracker.num_other_errors += 1
-        except openai.error.ServiceUnavailableError as se:
+        except (
+            openai.error.ServiceUnavailableError,
+            openai.error.APIError
+        ) as e:
             error = True
             progress_tracker.num_api_errors += 1
         except (
@@ -160,7 +160,7 @@ class OpenAiGeneration(BaseGeneration):
                     run_id=self.id
                 )
 
-            raise e
+            self.max_attempts = 0
         except Exception as e:
             error = True
 
@@ -170,7 +170,7 @@ class OpenAiGeneration(BaseGeneration):
                     run_id=self.id
                 )
 
-            raise e
+            self.max_attempts = 0
 
         if error:
             if self.max_attempts:
