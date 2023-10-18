@@ -179,10 +179,10 @@ class OpenAiGeneration(BaseGeneration):
                 progress_tracker.num_tasks_in_progress -= 1
                 progress_tracker.num_tasks_failed += 1
         else:
-            completion = {
+            completion = json.dumps({
                 "name": response.choices[0].message.function_call.name,
                 "arguments": response.choices[0].message.function_call.arguments
-            } if "function_call" in response.choices[0].message \
+            }) if "function_call" in response.choices[0].message \
                 else response.choices[0].message.content
             response: GenerationResponse = GenerationResponse(
                 id=str(self.id),

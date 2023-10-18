@@ -57,7 +57,7 @@ from typing import Literal, List
 
 from pydantic import BaseModel, Field
 
-from langbridge.handlers import OpenAiGenerationHandler
+from langbridge.handlers.generation import OpenAiGenerationHandler
 from langbridge.schema import GenerationResponse
 from langbridge.callbacks.analytics import LangfuseCallbackHandler
 

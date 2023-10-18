@@ -1,0 +1,21 @@
+[
+    {
+        "name": "validate",
+        "description": "Validate if a statement is True or False",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "answer": {
+                    "description": "Whether the statement is True or False",
+                    "enum": ["True", "False"],
+                    "type": "string"
+                },
+                "reason": {
+                    "description": "A detailed reason why the statement is True or False",
+                    "type": "string"
+                }
+            },
+            "required": ["answer", "reason"]
+        }
+    }
+]

@@ -6,7 +6,7 @@ from typing import Dict, Any, Optional, Union
 
 from langfuse.api.resources.commons.types.observation_level import ObservationLevel
 from langfuse.client import Langfuse, StatefulGenerationClient, StatefulTraceClient
-from langfuse.model import CreateGeneration, CreateSpan, CreateTrace, UpdateGeneration, UpdateSpan
+from langfuse.model import CreateGeneration, CreateTrace, UpdateGeneration
 
 from .. import BaseCallbackHandler
 
@@ -140,7 +140,6 @@ class LangfuseCallbackHandler(BaseCallbackHandler):
         ** kwargs: Any
     ):
         completion = response.get("completion")
-        completion = json.dumps(completion) if isinstance(completion, dict) else completion
 
         self.runs[run_id] = self.runs[run_id].update(
             UpdateGeneration(

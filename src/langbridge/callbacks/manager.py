@@ -24,7 +24,7 @@ def _handle_event(
     for handler in handlers:
         try:
             getattr(handler, event_name)(*args, **kwargs)
-        except NotImplemented as e:
+        except NotImplementedError as e:
             handler_name = handler.__class__.__name__
             _logger.warning(
                 f"NotImplementedError in {handler_name}.{event_name}"

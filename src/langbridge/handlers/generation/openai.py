@@ -15,7 +15,6 @@ from langbridge.generation import OpenAiGeneration
 from langbridge.utils import get_logger
 from langbridge.schema import GenerationHandlerInput, OpenAiGenerationPrompt
 from langbridge.parameters import OpenAiChatCompletionParameters
-from langbridge.settings import get_openai_settings
 
 
 _logger = get_logger()
@@ -33,6 +32,12 @@ class OpenAiGenerationHandler(BaseGenerationHandler):
 
         # TODO: Remove `response_model` support
         response_model = values.get("response_model")
+
+        if response_model and values["functions"] and len(values["functions"]):
+            _logger.warning(f"To keep the prompt length reasonable, "
+                            f"`response_model` will be ignored in favor of `functions`. "
+                            f"Consider using `functions` instead of `response_format`")
+            response_model = None
 
         if base_prompt and response_model:
             parser = PydanticOutputParser(pydantic_object=response_model)
