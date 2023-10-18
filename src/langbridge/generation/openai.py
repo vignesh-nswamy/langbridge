@@ -21,14 +21,26 @@ class OpenAiGeneration(BaseGeneration):
     prompt: OpenAiGenerationPrompt
 
     async def _call_api(self) -> OpenAIObject:
-        return await openai.ChatCompletion.acreate(
-            messages=[
-                message.dict()
-                for message in self.prompt.messages
-            ],
-            model=self.model,
-            **self.model_parameters.dict()
-        )
+        if len(self.functions):
+            return await openai.ChatCompletion.acreate(
+                messages=[
+                    message.dict()
+                    for message in self.prompt.messages
+                ],
+                model=self.model,
+                **self.model_parameters.dict(),
+                functions=self.functions,
+                function_call="auto"
+            )
+        else:
+            return await openai.ChatCompletion.acreate(
+                messages=[
+                    message.dict()
+                    for message in self.prompt.messages
+                ],
+                model=self.model,
+                **self.model_parameters.dict()
+            )
 
     @validator("usage", pre=True, always=True)
     def resolve_usage(cls, v: Usage, values: Dict[str, Any]) -> Usage:
@@ -42,6 +54,37 @@ class OpenAiGeneration(BaseGeneration):
             prompt_tokens += 4  # every message follows <im_start>{role/name}\n{content}<im_end>\n
             prompt_tokens += len(encoder.encode(message.role)) + len(encoder.encode(message.content))
         prompt_tokens += 2  # every reply is primed with <im_start>assistant
+
+        # Compute tokens for function calls
+        # TODO: For the love of God, find a better way to estimate the number of function call tokens
+        function_call_tokens = 0
+        for function in values["functions"]:
+            function_tokens = len(encoder.encode(function["name"]))
+            function_tokens += len(encoder.encode(function["description"]))
+
+            parameters = function.get("parameters", {})
+
+            if "type" in parameters:
+                function_tokens += len(encoder.encode("type"))
+                function_tokens += len(encoder.encode(parameters["type"]))
+
+            properties = parameters.get("properties", {})
+            for property_key, property_value in properties.items():
+                function_tokens += len(encoder.encode(property_key))
+                for field, value in property_value.items():
+                    if field in {"type", "description"}:
+                        function_tokens += len(encoder.encode(value)) + 2
+                    elif field == "enum":
+                        function_tokens += sum(len(encoder.encode(o)) + 3 for o in value) - 3
+
+            function_tokens += 11  # adjust as necessary based on actual token costs
+            function_call_tokens += function_tokens
+
+        # Hacky goddamn crap to make function call tokens estimation match OpenAI estimation
+        function_call_tokens = function_call_tokens + 12 - 2 * (len(values["functions"]) - 2) \
+            if function_call_tokens else function_call_tokens
+
+        prompt_tokens += function_call_tokens
 
         completion_tokens = values["model_parameters"].max_tokens
 
@@ -90,9 +133,6 @@ class OpenAiGeneration(BaseGeneration):
         error = False
         try:
             response: OpenAIObject = await self._call_api()
-        except openai.error.APIError as ae:
-            error = True
-            progress_tracker.num_api_errors += 1
         except openai.error.RateLimitError as re:
             error = True
             progress_tracker.time_last_rate_limit_error = time.time()
@@ -100,7 +140,10 @@ class OpenAiGeneration(BaseGeneration):
         except openai.error.Timeout as te:
             error = True
             progress_tracker.num_other_errors += 1
-        except openai.error.ServiceUnavailableError as se:
+        except (
+            openai.error.ServiceUnavailableError,
+            openai.error.APIError
+        ) as e:
             error = True
             progress_tracker.num_api_errors += 1
         except (
@@ -117,7 +160,7 @@ class OpenAiGeneration(BaseGeneration):
                     run_id=self.id
                 )
 
-            raise e
+            self.max_attempts = 0
         except Exception as e:
             error = True
 
@@ -127,7 +170,7 @@ class OpenAiGeneration(BaseGeneration):
                     run_id=self.id
                 )
 
-            raise e
+            self.max_attempts = 0
 
         if error:
             if self.max_attempts:
@@ -136,9 +179,14 @@ class OpenAiGeneration(BaseGeneration):
                 progress_tracker.num_tasks_in_progress -= 1
                 progress_tracker.num_tasks_failed += 1
         else:
+            completion = json.dumps({
+                "name": response.choices[0].message.function_call.name,
+                "arguments": response.choices[0].message.function_call.arguments
+            }) if "function_call" in response.choices[0].message \
+                else response.choices[0].message.content
             response: GenerationResponse = GenerationResponse(
                 id=str(self.id),
-                completion=response.choices[0].message.content,
+                completion=completion,
                 usage=response.usage.to_dict(),
                 metadata=self.metadata
             )

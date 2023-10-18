@@ -13,7 +13,7 @@ langbridge generation --service openai \
   --infile ./examples/input.jsonl \
   --outfile ./examples/output.jsonl \
   --prompt-file ./examples/prompt.txt \
-  --response-format-file ./examples/response-format.json \
+  --functions-file ./examples/functions.json \
   --model-parameters '{"max_tokens": 75, "temperature": 0}' \
   --max-requests-per-minute 100 \
   --max-tokens-per-minute 39500 \
