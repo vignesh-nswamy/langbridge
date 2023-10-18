@@ -95,7 +95,8 @@ class LangfuseCallbackHandler(BaseCallbackHandler):
                 completion_start_time=start_time,
                 prompt=prompt,
                 usage=serialized["usage"],
-                level=ObservationLevel.DEFAULT
+                level=ObservationLevel.DEFAULT,
+                metadata=serialized.get("metadata", {})
             )
         )
 
